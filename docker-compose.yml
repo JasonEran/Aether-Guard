@@ -9,3 +9,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
     restart: always
+  agent-service:
+    build:
+      context: ./src/services/agent-cpp
+    depends_on:
+      - core-service
+    restart: always
