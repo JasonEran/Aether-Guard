@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { fetchLatestTelemetry, DashboardData } from '../lib/api';
+import { fetchHistory, fetchLatestTelemetry, DashboardData, TelemetryRecord } from '../lib/api';
+import HistoryChart from '../components/HistoryChart';
 
 const ShieldIcon = ({ className }: { className?: string }) => (
   <svg
@@ -38,14 +39,16 @@ const WarningIcon = ({ className }: { className?: string }) => (
 
 export default function Page() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [history, setHistory] = useState<TelemetryRecord[]>([]);
 
   useEffect(() => {
     let isMounted = true;
 
     const load = async () => {
-      const latest = await fetchLatestTelemetry();
+      const [latest, historyData] = await Promise.all([fetchLatestTelemetry(), fetchHistory()]);
       if (isMounted) {
         setData(latest);
+        setHistory(historyData);
       }
     };
 
@@ -122,6 +125,15 @@ export default function Page() {
         <div className="md:col-span-3 rounded-2xl border border-slate-800 bg-slate-900 p-6">
           <div className="text-sm uppercase tracking-wide text-slate-400">Last Updated</div>
           <div className="mt-3 text-2xl font-semibold">{lastUpdated}</div>
+        </div>
+      </section>
+
+      <section className="max-w-5xl mx-auto mt-8">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
+          <div className="text-sm uppercase tracking-wide text-slate-400">Real-time Trends</div>
+          <div className="mt-4">
+            <HistoryChart data={history} />
+          </div>
         </div>
       </section>
     </main>

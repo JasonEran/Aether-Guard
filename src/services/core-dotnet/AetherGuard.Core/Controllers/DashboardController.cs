@@ -1,4 +1,6 @@
+using AetherGuard.Core.Data;
 using AetherGuard.Core.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AetherGuard.Core.Controllers;
@@ -8,10 +10,12 @@ namespace AetherGuard.Core.Controllers;
 public class DashboardController : ControllerBase
 {
     private readonly TelemetryStore _store;
+    private readonly ApplicationDbContext _context;
 
-    public DashboardController(TelemetryStore store)
+    public DashboardController(TelemetryStore store, ApplicationDbContext context)
     {
         _store = store;
+        _context = context;
     }
 
     [HttpGet("latest")]
@@ -24,5 +28,17 @@ public class DashboardController : ControllerBase
         }
 
         return Ok(latest);
+    }
+
+    [HttpGet("history")]
+    public async Task<IActionResult> GetHistory()
+    {
+        var records = await _context.TelemetryRecords
+            .OrderByDescending(x => x.Timestamp)
+            .Take(20)
+            .Reverse()
+            .ToListAsync();
+
+        return Ok(records);
     }
 }
