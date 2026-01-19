@@ -13,3 +13,11 @@ services:
     depends_on:
       - core-service
     restart: always
+  ai-service:
+    build:
+      context: ./src/services/ai-engine
+    ports:
+      - "8000:8000"
+    environment:
+      PYTHONUNBUFFERED: "1"
+    restart: always
