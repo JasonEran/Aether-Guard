@@ -6,6 +6,9 @@ services:
       - "5000:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Host=db;Database=AetherGuardDb;Username=postgres;Password=password"
+    depends_on:
+      - db
     restart: always
   agent-service:
     build:
@@ -21,3 +24,17 @@ services:
     environment:
       PYTHONUNBUFFERED: "1"
     restart: always
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: AetherGuardDb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+
+volumes:
+  postgres_data:

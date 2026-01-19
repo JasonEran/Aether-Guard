@@ -1,3 +1,4 @@
+using AetherGuard.Core.Data;
 using AetherGuard.Core.Models;
 using AetherGuard.Core.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -11,15 +12,18 @@ public class IngestionController : ControllerBase
     private readonly ILogger<IngestionController> _logger;
     private readonly TelemetryStore _telemetryStore;
     private readonly AnalysisService _analysisService;
+    private readonly ApplicationDbContext _context;
 
     public IngestionController(
         ILogger<IngestionController> logger,
         TelemetryStore telemetryStore,
-        AnalysisService analysisService)
+        AnalysisService analysisService,
+        ApplicationDbContext context)
     {
         _logger = logger;
         _telemetryStore = telemetryStore;
         _analysisService = analysisService;
+        _context = context;
     }
 
     // POST: api/v1/ingestion
@@ -33,10 +37,23 @@ public class IngestionController : ControllerBase
         }
 
         var analysis = await _analysisService.AnalyzeAsync(payload);
-        _telemetryStore.Update(payload, analysis);
-
         var status = analysis?.Status ?? "Unavailable";
         var confidence = analysis?.Confidence ?? 0.0;
+
+        var record = new TelemetryRecord
+        {
+            AgentId = payload.AgentId,
+            CpuUsage = payload.CpuUsage,
+            MemoryUsage = payload.MemoryUsage,
+            AiStatus = status,
+            AiConfidence = confidence,
+            Timestamp = DateTimeOffset.FromUnixTimeSeconds(payload.Timestamp).UtcDateTime
+        };
+
+        _context.TelemetryRecords.Add(record);
+        await _context.SaveChangesAsync();
+
+        _telemetryStore.Update(payload, analysis);
 
         _logger.LogInformation("[Telemetry] Agent: {Id} | CPU: {Cpu}% | Mem: {Mem}MB | AI: {Status} ({Confidence:P0})",
             payload.AgentId, payload.CpuUsage, payload.MemoryUsage, status, confidence);
