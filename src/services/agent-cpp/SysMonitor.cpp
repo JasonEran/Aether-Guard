@@ -2,6 +2,7 @@
 
 #include <ctime>
 #include <fstream>
+#include <algorithm>
 #include <sstream>
 #include <string>
 
@@ -92,7 +93,9 @@ TelemetryData SysMonitor::collect() {
             unsigned long long idleDelta = idle - prevIdle_;
             unsigned long long totalDelta = total - prevTotal_;
             if (totalDelta > 0) {
-                data.cpuUsage = static_cast<double>(idleDelta) / static_cast<double>(totalDelta);
+                double idleRatio = static_cast<double>(idleDelta) / static_cast<double>(totalDelta);
+                double usage = 1.0 - idleRatio;
+                data.cpuUsage = std::clamp(usage, 0.0, 1.0);
             }
         }
 

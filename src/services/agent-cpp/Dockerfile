@@ -1,7 +1,7 @@
 # Multi-stage build for the C++ agent
 FROM alpine:latest AS builder
 
-RUN apk add --no-cache build-base cmake
+RUN apk add --no-cache build-base cmake curl-dev
 
 WORKDIR /src
 COPY CMakeLists.txt .
@@ -12,7 +12,7 @@ RUN cmake . && make
 
 FROM alpine:latest AS runtime
 
-RUN apk add --no-cache libstdc++ libgcc
+RUN apk add --no-cache libstdc++ libgcc libcurl
 
 WORKDIR /app
 COPY --from=builder /src/AetherAgent ./AetherAgent
