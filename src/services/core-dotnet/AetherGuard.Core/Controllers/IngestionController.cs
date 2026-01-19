@@ -32,9 +32,9 @@ public class IngestionController : ControllerBase
             return BadRequest("Invalid CPU Usage value.");
         }
 
-        _telemetryStore.Update(payload);
-
         var analysis = await _analysisService.AnalyzeAsync(payload);
+        _telemetryStore.Update(payload, analysis);
+
         var status = analysis?.Status ?? "Unavailable";
         var confidence = analysis?.Confidence ?? 0.0;
 

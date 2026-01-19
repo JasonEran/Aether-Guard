@@ -5,26 +5,35 @@ namespace AetherGuard.Core.Services;
 public sealed class TelemetryStore
 {
     private readonly object _lock = new();
-    private TelemetryPayload? _latest;
+    private TelemetryPayload? _latestTelemetry;
+    private AnalysisResult? _latestAnalysis;
 
-    public void Update(TelemetryPayload data)
+    public void Update(TelemetryPayload telemetry, AnalysisResult? analysis)
     {
-        if (data is null)
+        if (telemetry is null)
         {
             return;
         }
 
         lock (_lock)
         {
-            _latest = data;
+            _latestTelemetry = telemetry;
+            _latestAnalysis = analysis;
         }
     }
 
-    public TelemetryPayload? GetLatest()
+    public TelemetrySnapshot? GetLatest()
     {
         lock (_lock)
         {
-            return _latest;
+            if (_latestTelemetry is null)
+            {
+                return null;
+            }
+
+            return new TelemetrySnapshot(_latestTelemetry, _latestAnalysis);
         }
     }
 }
+
+public record TelemetrySnapshot(TelemetryPayload Telemetry, AnalysisResult? Analysis);
