@@ -1,0 +1,11 @@
+version: "3.8"
+
+services:
+  core-service:
+    build:
+      context: ./src/services/core-dotnet/AetherGuard.Core
+    ports:
+      - "5000:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+    restart: always
