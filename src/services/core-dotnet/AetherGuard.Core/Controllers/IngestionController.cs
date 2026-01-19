@@ -1,4 +1,5 @@
 using AetherGuard.Core.Models;
+using AetherGuard.Core.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AetherGuard.Core.Controllers;
@@ -8,10 +9,12 @@ namespace AetherGuard.Core.Controllers;
 public class IngestionController : ControllerBase
 {
     private readonly ILogger<IngestionController> _logger;
+    private readonly TelemetryStore _telemetryStore;
 
-    public IngestionController(ILogger<IngestionController> logger)
+    public IngestionController(ILogger<IngestionController> logger, TelemetryStore telemetryStore)
     {
         _logger = logger;
+        _telemetryStore = telemetryStore;
     }
 
     // POST: api/v1/ingestion
@@ -24,8 +27,10 @@ public class IngestionController : ControllerBase
             return BadRequest("Invalid CPU Usage value.");
         }
 
-        _logger.LogInformation("📡 [Telementry] Agent: {Id} | CPU: {Cpu}% | Mem: {Mem}MB", 
+        _logger.LogInformation("[Telemetry] Agent: {Id} | CPU: {Cpu}% | Mem: {Mem}MB", 
             payload.AgentId, payload.CpuUsage, payload.MemoryUsage);
+
+        _telemetryStore.Update(payload);
 
         return Ok(new { status = "accepted", timestamp = DateTime.UtcNow });
     }
