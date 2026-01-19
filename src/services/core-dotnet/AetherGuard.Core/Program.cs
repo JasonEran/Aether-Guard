@@ -7,6 +7,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddSingleton<TelemetryStore>();
+builder.Services.AddHttpClient<AnalysisService>();
 
 builder.Services.AddCors(options =>
 {

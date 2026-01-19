@@ -10,16 +10,21 @@ public class IngestionController : ControllerBase
 {
     private readonly ILogger<IngestionController> _logger;
     private readonly TelemetryStore _telemetryStore;
+    private readonly AnalysisService _analysisService;
 
-    public IngestionController(ILogger<IngestionController> logger, TelemetryStore telemetryStore)
+    public IngestionController(
+        ILogger<IngestionController> logger,
+        TelemetryStore telemetryStore,
+        AnalysisService analysisService)
     {
         _logger = logger;
         _telemetryStore = telemetryStore;
+        _analysisService = analysisService;
     }
 
     // POST: api/v1/ingestion
     [HttpPost]
-    public IActionResult ReceiveTelemetry([FromBody] TelemetryPayload payload)
+    public async Task<IActionResult> ReceiveTelemetry([FromBody] TelemetryPayload payload)
     {
         if (payload.CpuUsage < 0 || payload.CpuUsage > 100)
         {
@@ -27,10 +32,14 @@ public class IngestionController : ControllerBase
             return BadRequest("Invalid CPU Usage value.");
         }
 
-        _logger.LogInformation("[Telemetry] Agent: {Id} | CPU: {Cpu}% | Mem: {Mem}MB", 
-            payload.AgentId, payload.CpuUsage, payload.MemoryUsage);
-
         _telemetryStore.Update(payload);
+
+        var analysis = await _analysisService.AnalyzeAsync(payload);
+        var status = analysis?.Status ?? "Unavailable";
+        var confidence = analysis?.Confidence ?? 0.0;
+
+        _logger.LogInformation("[Telemetry] Agent: {Id} | CPU: {Cpu}% | Mem: {Mem}MB | AI: {Status} ({Confidence:P0})",
+            payload.AgentId, payload.CpuUsage, payload.MemoryUsage, status, confidence);
 
         return Ok(new { status = "accepted", timestamp = DateTime.UtcNow });
     }
