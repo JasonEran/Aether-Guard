@@ -1,0 +1,22 @@
+# General
+.DS_Store
+.vscode/
+
+# C++
+*.o
+*.exe
+build/
+
+# .NET
+bin/
+obj/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+
+# Node
+node_modules/
+.next/
