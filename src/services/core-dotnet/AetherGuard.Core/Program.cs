@@ -1,6 +1,8 @@
 using AetherGuard.Core.Data;
 using AetherGuard.Core.Services;
+using AetherGuard.Core.Services.Messaging;
 using Microsoft.EntityFrameworkCore;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +12,8 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddSingleton<TelemetryStore>();
 builder.Services.AddHttpClient<AnalysisService>();
+builder.Services.AddSingleton<IMessageProducer, RabbitMQProducer>();
+builder.Services.AddHostedService<TelemetryProcessor>();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
@@ -17,7 +21,14 @@ if (string.IsNullOrWhiteSpace(connectionString))
     throw new InvalidOperationException("DefaultConnection is not configured.");
 }
 
+var redisConnection = builder.Configuration.GetConnectionString("Redis");
+if (string.IsNullOrWhiteSpace(redisConnection))
+{
+    throw new InvalidOperationException("Redis connection string is not configured.");
+}
+
 builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseNpgsql(connectionString));
+builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnection));
 
 builder.Services.AddCors(options =>
 {

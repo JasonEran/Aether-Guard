@@ -1,7 +1,8 @@
-using AetherGuard.Core.Data;
 using AetherGuard.Core.Models;
 using AetherGuard.Core.Services;
+using AetherGuard.Core.Services.Messaging;
 using Microsoft.AspNetCore.Mvc;
+using StackExchange.Redis;
 
 namespace AetherGuard.Core.Controllers;
 
@@ -10,20 +11,17 @@ namespace AetherGuard.Core.Controllers;
 public class IngestionController : ControllerBase
 {
     private readonly ILogger<IngestionController> _logger;
-    private readonly TelemetryStore _telemetryStore;
-    private readonly AnalysisService _analysisService;
-    private readonly ApplicationDbContext _context;
+    private readonly IConnectionMultiplexer _redis;
+    private readonly IMessageProducer _producer;
 
     public IngestionController(
         ILogger<IngestionController> logger,
-        TelemetryStore telemetryStore,
-        AnalysisService analysisService,
-        ApplicationDbContext context)
+        IConnectionMultiplexer redis,
+        IMessageProducer producer)
     {
         _logger = logger;
-        _telemetryStore = telemetryStore;
-        _analysisService = analysisService;
-        _context = context;
+        _redis = redis;
+        _producer = producer;
     }
 
     // POST: api/v1/ingestion
@@ -36,28 +34,19 @@ public class IngestionController : ControllerBase
             return BadRequest("Invalid CPU Usage value.");
         }
 
-        var analysis = await _analysisService.AnalyzeAsync(payload);
-        var status = analysis?.Status ?? "Unavailable";
-        var confidence = analysis?.Confidence ?? 0.0;
+        var dedupKey = $"dedup:{payload.AgentId}:{payload.Timestamp}";
+        var database = _redis.GetDatabase();
+        var setResult = await database.StringSetAsync(dedupKey, "1", TimeSpan.FromSeconds(10), When.NotExists);
 
-        var record = new TelemetryRecord
+        if (!setResult)
         {
-            AgentId = payload.AgentId,
-            CpuUsage = payload.CpuUsage,
-            MemoryUsage = payload.MemoryUsage,
-            AiStatus = status,
-            AiConfidence = confidence,
-            Timestamp = DateTimeOffset.FromUnixTimeSeconds(payload.Timestamp).UtcDateTime
-        };
+            _logger.LogInformation("[Telemetry] Duplicate payload ignored for {AgentId}", payload.AgentId);
+            return Accepted("Duplicate");
+        }
 
-        _context.TelemetryRecords.Add(record);
-        await _context.SaveChangesAsync();
+        _producer.SendMessage(payload);
+        _logger.LogInformation("[Telemetry] Enqueued payload for {AgentId}", payload.AgentId);
 
-        _telemetryStore.Update(payload, analysis);
-
-        _logger.LogInformation("[Telemetry] Agent: {Id} | CPU: {Cpu}% | Mem: {Mem}MB | AI: {Status} ({Confidence:P0})",
-            payload.AgentId, payload.CpuUsage, payload.MemoryUsage, status, confidence);
-
-        return Ok(new { status = "accepted", timestamp = DateTime.UtcNow });
+        return Accepted(new { status = "queued", timestamp = DateTime.UtcNow });
     }
 }
