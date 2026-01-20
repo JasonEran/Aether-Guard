@@ -10,5 +10,6 @@ public class ApplicationDbContext : DbContext
     {
     }
 
+    public DbSet<Agent> Agents => Set<Agent>();
     public DbSet<TelemetryRecord> TelemetryRecords => Set<TelemetryRecord>();
 }
