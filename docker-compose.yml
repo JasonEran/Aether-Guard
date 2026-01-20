@@ -90,6 +90,7 @@ services:
 
   db:
     image: timescale/timescaledb:latest-pg15
+    command: ["postgres", "-c", "shared_preload_libraries=timescaledb"]
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
