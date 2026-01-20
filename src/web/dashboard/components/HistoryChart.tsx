@@ -46,7 +46,10 @@ export default function HistoryChart({ data }: HistoryChartProps) {
               color: '#e2e8f0',
             }}
             labelFormatter={(value) => `Time: ${formatTime(value as string | number)}`}
-            formatter={(value: number, name: string) => [`${value.toFixed(1)}%`, name]}
+            formatter={(value, name) => {
+              const numeric = typeof value === 'number' ? value : Number(value);
+              return [`${Number.isFinite(numeric) ? numeric.toFixed(1) : '--'}%`, name];
+            }}
           />
           <Line
             type="monotone"

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { fetchHistory, fetchLatestTelemetry, DashboardData, TelemetryRecord } from '../lib/api';
 import HistoryChart from '../components/HistoryChart';
+import { handleSignOut } from './actions';
 
 const ShieldIcon = ({ className }: { className?: string }) => (
   <svg
@@ -88,11 +89,26 @@ export default function Page() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-8">
-      <header className="max-w-5xl mx-auto">
-        <h1 className="text-3xl font-semibold">Aether-Guard Live Monitor</h1>
-        <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-300">
-          <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
-          Agent ID: {data.telemetry.agentId}
+      <header className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
+            <h1 className="text-3xl font-semibold">Aether-Guard Live Monitor</h1>
+          </div>
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-300">
+            Agent ID: {data.telemetry.agentId}
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-slate-400">Welcome, Admin</span>
+          <form action={handleSignOut}>
+            <button
+              type="submit"
+              className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-emerald-500 hover:text-emerald-200"
+            >
+              Sign Out
+            </button>
+          </form>
         </div>
       </header>
 

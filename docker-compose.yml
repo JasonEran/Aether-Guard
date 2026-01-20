@@ -24,6 +24,17 @@ services:
     environment:
       PYTHONUNBUFFERED: "1"
     restart: always
+  web-service:
+    build:
+      context: ./src/web/dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      AUTH_SECRET: "super-secret-key"
+      AUTH_TRUST_HOST: "true"
+    depends_on:
+      - core-service
+    restart: always
   db:
     image: postgres:15-alpine
     environment:
