@@ -15,7 +15,7 @@ Preferred method:
 
 If that is not possible, contact the maintainers at:
 
-- security@aether-guard.org
+- eran@aethernex.com
 
 Please include:
 
