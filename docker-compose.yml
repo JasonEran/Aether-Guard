@@ -7,15 +7,31 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DefaultConnection: "Host=db;Database=AetherGuardDb;Username=postgres;Password=password"
+      ConnectionStrings__Redis: "redis:6379"
+      RabbitMq__Host: "rabbitmq"
+      RabbitMq__User: "admin"
+      RabbitMq__Password: "secure_password"
+      RabbitMq__Port: "5672"
     depends_on:
-      - db
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_started
     restart: always
+    networks:
+      - aether-net
+
   agent-service:
     build:
       context: ./src/services/agent-cpp
     depends_on:
       - core-service
     restart: always
+    networks:
+      - aether-net
+
   ai-service:
     build:
       context: ./src/services/ai-engine
@@ -24,6 +40,9 @@ services:
     environment:
       PYTHONUNBUFFERED: "1"
     restart: always
+    networks:
+      - aether-net
+
   web-service:
     build:
       context: ./src/web/dashboard
@@ -35,8 +54,42 @@ services:
     depends_on:
       - core-service
     restart: always
+    networks:
+      - aether-net
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: "admin"
+      RABBITMQ_DEFAULT_PASS: "secure_password"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - aether-net
+
+  redis:
+    image: redis:alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - aether-net
+
   db:
-    image: postgres:15-alpine
+    image: timescale/timescaledb:latest-pg15
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -46,6 +99,12 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: always
+    networks:
+      - aether-net
 
 volumes:
   postgres_data:
+
+networks:
+  aether-net:
+    driver: bridge
