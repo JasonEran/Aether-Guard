@@ -1,22 +1,64 @@
-# General
+# OS
 .DS_Store
-.vscode/
+Thumbs.db
 
-# C++
-*.o
-*.exe
-build/
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
 
 # .NET
 bin/
 obj/
+.vs/
+
+# C++
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+build/
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
 
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
 venv/
-.env
 
-# Node
+# Node.js
 node_modules/
 .next/
+out/
+dist/
+.npm/
+.pnpm-store/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Coverage
+coverage/
+
+# Environment files
+.env*
+
+# Docker
+*.tar
