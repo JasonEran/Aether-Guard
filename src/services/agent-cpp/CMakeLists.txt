@@ -1,11 +1,27 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.14)
 project(AetherAgent)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(CURL REQUIRED)
-include_directories(${CURL_INCLUDE_DIRS})
+include(FetchContent)
+
+set(CPR_USE_SYSTEM_CURL ON)
+set(CPR_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.2
+)
+
+FetchContent_Declare(
+    cpr
+    GIT_REPOSITORY https://github.com/libcpr/cpr.git
+    GIT_TAG 1.10.4
+)
+
+FetchContent_MakeAvailable(nlohmann_json cpr)
 
 add_executable(AetherAgent
     main.cpp
@@ -13,4 +29,7 @@ add_executable(AetherAgent
     NetworkClient.cpp
 )
 
-target_link_libraries(AetherAgent ${CURL_LIBRARIES})
+target_link_libraries(AetherAgent
+    cpr::cpr
+    nlohmann_json::nlohmann_json
+)
