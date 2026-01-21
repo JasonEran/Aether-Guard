@@ -28,10 +28,31 @@ public class IngestionController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> ReceiveTelemetry([FromBody] TelemetryPayload payload)
     {
+        if (payload is null)
+        {
+            return BadRequest("Telemetry payload is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(payload.AgentId))
+        {
+            return BadRequest("AgentId is required.");
+        }
+
+        if (payload.Timestamp <= 0)
+        {
+            return BadRequest("Timestamp is required.");
+        }
+
         if (payload.CpuUsage < 0 || payload.CpuUsage > 100)
         {
             _logger.LogWarning("Received invalid CPU data from {AgentId}", payload.AgentId);
             return BadRequest("Invalid CPU Usage value.");
+        }
+
+        if (payload.MemoryUsage < 0 || payload.MemoryUsage > 100)
+        {
+            _logger.LogWarning("Received invalid memory data from {AgentId}", payload.AgentId);
+            return BadRequest("Invalid Memory Usage value.");
         }
 
         var dedupKey = $"dedup:{payload.AgentId}:{payload.Timestamp}";

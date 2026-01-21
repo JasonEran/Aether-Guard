@@ -1,5 +1,7 @@
 using AetherGuard.Core.Data;
 using AetherGuard.Core.Models;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,15 +12,35 @@ namespace AetherGuard.Core.Controllers;
 public class CommandController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
+    private readonly ILogger<CommandController> _logger;
+    private readonly string? _commandApiKey;
 
-    public CommandController(ApplicationDbContext context)
+    public CommandController(ApplicationDbContext context, IConfiguration configuration, ILogger<CommandController> logger)
     {
         _context = context;
+        _logger = logger;
+        _commandApiKey = configuration["Security:CommandApiKey"];
     }
 
     [HttpPost("{agentId:guid}/commands")]
     public async Task<IActionResult> CreateCommand(Guid agentId, [FromBody] CommandRequest request, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(_commandApiKey))
+        {
+            _logger.LogError("Security:CommandApiKey is not configured.");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Command API key not configured." });
+        }
+
+        if (!Request.Headers.TryGetValue("X-API-Key", out var providedKey))
+        {
+            return Unauthorized(new { error = "Missing API key." });
+        }
+
+        if (!FixedTimeEquals(providedKey.ToString(), _commandApiKey))
+        {
+            return Unauthorized(new { error = "Invalid API key." });
+        }
+
         if (request is null || string.IsNullOrWhiteSpace(request.Type))
         {
             return BadRequest(new { error = "Command type is required." });
@@ -42,6 +64,15 @@ public class CommandController : ControllerBase
         await _context.SaveChangesAsync(cancellationToken);
 
         return Accepted(new { status = "queued", commandId = command.Id });
+    }
+
+    private static bool FixedTimeEquals(string left, string right)
+    {
+        var leftBytes = Encoding.UTF8.GetBytes(left);
+        var rightBytes = Encoding.UTF8.GetBytes(right);
+
+        return leftBytes.Length == rightBytes.Length
+            && CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
     }
 
     public sealed class CommandRequest

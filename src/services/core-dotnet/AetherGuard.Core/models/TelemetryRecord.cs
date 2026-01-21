@@ -6,7 +6,6 @@ namespace AetherGuard.Core.Models;
 [Table("TelemetryRecords")]
 public class TelemetryRecord
 {
-    [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     [Column("Id")]
     public long Id { get; set; }

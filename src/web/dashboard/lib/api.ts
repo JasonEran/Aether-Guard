@@ -26,12 +26,12 @@ export interface TelemetryRecord {
 }
 
 export async function sendCommand(agentId: string, type: string): Promise<void> {
-  const response = await fetch(`http://localhost:5000/api/v1/agents/${agentId}/commands`, {
+  const response = await fetch('/api/commands', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ type }),
+    body: JSON.stringify({ agentId, type }),
   });
 
   if (!response.ok) {
@@ -42,7 +42,7 @@ export async function sendCommand(agentId: string, type: string): Promise<void> 
 
 export async function fetchLatestTelemetry(): Promise<DashboardData | null> {
   try {
-    const response = await fetch('http://localhost:5000/api/v1/dashboard/latest', {
+    const response = await fetch('/api/dashboard/latest', {
       cache: 'no-store',
     });
 
@@ -60,7 +60,7 @@ export async function fetchLatestTelemetry(): Promise<DashboardData | null> {
 
 export async function fetchHistory(): Promise<TelemetryRecord[]> {
   try {
-    const response = await fetch('http://localhost:5000/api/v1/dashboard/history', {
+    const response = await fetch('/api/dashboard/history', {
       cache: 'no-store',
     });
 

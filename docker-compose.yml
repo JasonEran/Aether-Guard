@@ -12,6 +12,7 @@ services:
       RabbitMq__User: "admin"
       RabbitMq__Password: "secure_password"
       RabbitMq__Port: "5672"
+      Security__CommandApiKey: "change-me-strong-key"
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -51,6 +52,8 @@ services:
     environment:
       AUTH_SECRET: "super-secret-key"
       AUTH_TRUST_HOST: "true"
+      COMMAND_API_KEY: "change-me-strong-key"
+      CORE_API_URL: "http://core-service:8080"
     depends_on:
       - core-service
     restart: always

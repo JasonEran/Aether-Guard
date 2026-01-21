@@ -31,7 +31,8 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<TelemetryRecord>(entity =>
         {
             entity.ToTable("TelemetryRecords");
-            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.HasKey(e => new { e.Id, e.Timestamp });
+            entity.Property(e => e.Id).HasColumnName("Id").ValueGeneratedOnAdd();
             entity.Property(e => e.AgentId).HasColumnName("AgentId");
             entity.Property(e => e.CpuUsage).HasColumnName("CpuUsage");
             entity.Property(e => e.MemoryUsage).HasColumnName("MemoryUsage");
