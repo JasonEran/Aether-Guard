@@ -1,12 +1,32 @@
 CREATE EXTENSION IF NOT EXISTS timescaledb;
 
-CREATE TABLE IF NOT EXISTS Agents (
-    Id UUID PRIMARY KEY,
-    AgentToken VARCHAR(255) NOT NULL,
-    Hostname VARCHAR(255) NOT NULL,
-    Status VARCHAR(50) NOT NULL,
-    LastHeartbeat TIMESTAMPTZ NOT NULL
+CREATE TABLE IF NOT EXISTS agents (
+    id UUID PRIMARY KEY,
+    agenttoken VARCHAR(255) NOT NULL,
+    hostname VARCHAR(255) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    lastheartbeat TIMESTAMPTZ NOT NULL
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS agents_agenttoken_key
+    ON agents (agenttoken);
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'Agents'
+    ) THEN
+        IF (SELECT COUNT(*) FROM agents) = 0
+           AND (SELECT COUNT(*) FROM "Agents") > 0 THEN
+            INSERT INTO agents (id, agenttoken, hostname, status, lastheartbeat)
+            SELECT id, agenttoken, hostname, status, lastheartbeat
+            FROM "Agents";
+        END IF;
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS "TelemetryRecords" (
     "Id" BIGSERIAL PRIMARY KEY,
@@ -32,6 +52,34 @@ ALTER TABLE IF EXISTS "TelemetryRecords"
 
 ALTER TABLE IF EXISTS "TelemetryRecords"
     ADD COLUMN IF NOT EXISTS "AiConfidence" DOUBLE PRECISION NOT NULL DEFAULT 0;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'telemetryrecords'
+    ) AND EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'TelemetryRecords'
+    ) THEN
+        IF (SELECT COUNT(*) FROM "TelemetryRecords") = 0
+           AND (SELECT COUNT(*) FROM telemetryrecords) > 0 THEN
+            INSERT INTO "TelemetryRecords" ("AgentId", "CpuUsage", "MemoryUsage", "AiStatus", "AiConfidence", "Timestamp")
+            SELECT
+                telemetryrecords.agentid::text,
+                telemetryrecords.cpuusage,
+                telemetryrecords.memoryusage,
+                ''::text,
+                0::double precision,
+                telemetryrecords."Timestamp"
+            FROM telemetryrecords;
+        END IF;
+    END IF;
+END $$;
 
 SELECT create_hypertable(
     '"TelemetryRecords"',

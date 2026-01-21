@@ -79,6 +79,12 @@ SysMonitor::SysMonitor()
       prevIdle_(0),
       prevTotal_(0) {}
 
+void SysMonitor::SetAgentId(const std::string& agentId) {
+    if (!agentId.empty()) {
+        agentId_ = agentId;
+    }
+}
+
 TelemetryData SysMonitor::collect() {
     TelemetryData data;
     data.agentId = agentId_;

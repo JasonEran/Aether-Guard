@@ -9,7 +9,7 @@ public class TelemetryRecord
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     [Column("Id")]
-    public int Id { get; set; }
+    public long Id { get; set; }
 
     [Column("AgentId")]
     public string AgentId { get; set; } = string.Empty;

@@ -20,8 +20,10 @@ int main() {
     }
 
     std::string token;
-    while (token.empty()) {
-        if (client.Register(hostname, token)) {
+    std::string agentId;
+    while (token.empty() || agentId.empty()) {
+        if (client.Register(hostname, token, agentId)) {
+            monitor.SetAgentId(agentId);
             std::cout << "[Agent] Registered with Core. Token acquired." << std::endl;
             break;
         }

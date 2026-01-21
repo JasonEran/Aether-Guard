@@ -24,7 +24,7 @@ std::string BuildUrl(const std::string& baseUrl, const std::string& path) {
 NetworkClient::NetworkClient(std::string baseUrl)
     : baseUrl_(std::move(baseUrl)) {}
 
-bool NetworkClient::Register(const std::string& hostname, std::string& outToken) {
+bool NetworkClient::Register(const std::string& hostname, std::string& outToken, std::string& outAgentId) {
     nlohmann::json payload = {
         {"hostname", hostname},
         {"os", "Linux"}
@@ -46,13 +46,14 @@ bool NetworkClient::Register(const std::string& hostname, std::string& outToken)
     }
 
     auto json = nlohmann::json::parse(response.text, nullptr, false);
-    if (json.is_discarded() || !json.contains("token")) {
-        std::cerr << "[Agent] register response missing token" << std::endl;
+    if (json.is_discarded() || !json.contains("token") || !json.contains("agentId")) {
+        std::cerr << "[Agent] register response missing token or agentId" << std::endl;
         return false;
     }
 
     outToken = json.value("token", "");
-    return !outToken.empty();
+    outAgentId = json.value("agentId", "");
+    return !outToken.empty() && !outAgentId.empty();
 }
 
 bool NetworkClient::SendHeartbeat(const std::string& token, const TelemetryData& data) {

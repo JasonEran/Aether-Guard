@@ -15,6 +15,7 @@ class SysMonitor {
 public:
     SysMonitor();
     TelemetryData collect();
+    void SetAgentId(const std::string& agentId);
 
 private:
     std::string agentId_;
