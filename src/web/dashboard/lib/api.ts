@@ -8,6 +8,8 @@ export interface DashboardData {
   analysis?: {
     status: string;
     confidence: number;
+    predictedCpu: number;
+    rootCause: string;
   };
 }
 
@@ -18,6 +20,8 @@ export interface TelemetryRecord {
   memoryUsage: number;
   aiStatus: string;
   aiConfidence?: number;
+  predictedCpu?: number;
+  rootCause?: string;
   timestamp: string;
 }
 

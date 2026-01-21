@@ -86,6 +86,14 @@ export default function Page() {
   const confidence = data.analysis?.confidence;
   const confidenceLabel =
     typeof confidence === 'number' ? `Confidence: ${(confidence * 100).toFixed(0)}%` : 'Confidence: --';
+  const predictedCpu = data.analysis?.predictedCpu;
+  const predictedLabel =
+    typeof predictedCpu === 'number' ? `Forecast: ${predictedCpu.toFixed(1)}%` : 'Forecast: --';
+  const rootCause = data.analysis?.rootCause?.trim();
+  const rootCauseText =
+    rootCause && rootCause.length > 0 ? rootCause : 'System Healthy. No anomalies detected.';
+  const rootCauseColor =
+    rootCause && rootCause.length > 0 ? 'text-amber-400' : 'text-slate-500';
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-8">
@@ -136,6 +144,14 @@ export default function Page() {
             {aiLabel}
           </div>
           <div className="mt-2 text-xs text-slate-500">{confidenceLabel}</div>
+        </div>
+
+        <div className="md:col-span-3 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
+          <div className="text-sm uppercase tracking-wide text-slate-400">
+            AI Root Cause Analysis
+          </div>
+          <div className={`mt-4 text-lg font-semibold ${rootCauseColor}`}>{rootCauseText}</div>
+          <div className="mt-2 text-xs text-slate-500">{predictedLabel}</div>
         </div>
 
         <div className="md:col-span-3 rounded-2xl border border-slate-800 bg-slate-900 p-6">

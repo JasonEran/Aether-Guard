@@ -13,6 +13,13 @@ public sealed record AnalysisResult
     [JsonPropertyName("prediction")]
     public double Prediction { get; init; }
 
-    [JsonPropertyName("rca")]
     public string RootCause { get; init; } = "Unavailable";
+
+    [JsonPropertyName("rca")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWriting)]
+    public string? Rca
+    {
+        get => RootCause;
+        init => RootCause = value ?? "Unavailable";
+    }
 }

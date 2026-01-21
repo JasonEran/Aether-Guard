@@ -72,7 +72,7 @@ public class AnalysisService
                 return CreateFallbackResult();
             }
 
-            return result;
+            return NormalizePrediction(result);
         }
         catch (Exception ex)
         {
@@ -89,6 +89,9 @@ public class AnalysisService
             Prediction = 0,
             RootCause = "Unavailable"
         };
+
+    private static AnalysisResult NormalizePrediction(AnalysisResult result)
+        => result with { Prediction = Math.Clamp(result.Prediction, 0, 100) };
 
     private sealed record TelemetrySample(double CpuUsage, double MemoryUsage);
 }
