@@ -1,3 +1,8 @@
-﻿fastapi>=0.100.0
+fastapi>=0.100.0
 uvicorn[standard]
+pydantic
+requests
 torch
+numpy
+pandas
+scikit-learn
