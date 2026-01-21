@@ -26,6 +26,12 @@ public class TelemetryRecord
     [Column("AiConfidence")]
     public double AiConfidence { get; set; }
 
+    [Column("RootCause")]
+    public string? RootCause { get; set; }
+
+    [Column("PredictedCpu")]
+    public double? PredictedCpu { get; set; }
+
     [Column("Timestamp")]
     public DateTime Timestamp { get; set; }
 }

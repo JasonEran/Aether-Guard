@@ -36,6 +36,8 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.MemoryUsage).HasColumnName("MemoryUsage");
             entity.Property(e => e.AiStatus).HasColumnName("AiStatus");
             entity.Property(e => e.AiConfidence).HasColumnName("AiConfidence");
+            entity.Property(e => e.RootCause).HasColumnName("RootCause");
+            entity.Property(e => e.PredictedCpu).HasColumnName("PredictedCpu");
             entity.Property(e => e.Timestamp).HasColumnName("Timestamp");
         });
     }

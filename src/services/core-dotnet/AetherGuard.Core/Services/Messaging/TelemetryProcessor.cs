@@ -93,8 +93,8 @@ public sealed class TelemetryProcessor : BackgroundService
                 var telemetryStore = scope.ServiceProvider.GetRequiredService<TelemetryStore>();
 
                 var analysis = await analysisService.AnalyzeAsync(payload);
-                var status = analysis?.Status ?? "Unavailable";
-                var confidence = analysis?.Confidence ?? 0.0;
+                var status = analysis.Status;
+                var confidence = analysis.Confidence;
 
                 var record = new TelemetryRecord
                 {
@@ -103,6 +103,8 @@ public sealed class TelemetryProcessor : BackgroundService
                     MemoryUsage = payload.MemoryUsage,
                     AiStatus = status,
                     AiConfidence = confidence,
+                    RootCause = analysis.RootCause,
+                    PredictedCpu = analysis.Prediction,
                     Timestamp = DateTimeOffset.FromUnixTimeSeconds(payload.Timestamp).UtcDateTime
                 };
 

@@ -1,0 +1,5 @@
+ALTER TABLE "TelemetryRecords"
+    ADD COLUMN IF NOT EXISTS "RootCause" TEXT;
+
+ALTER TABLE "TelemetryRecords"
+    ADD COLUMN IF NOT EXISTS "PredictedCpu" DOUBLE PRECISION;
