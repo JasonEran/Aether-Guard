@@ -56,7 +56,9 @@ bool NetworkClient::Register(const std::string& hostname, std::string& outToken,
     return !outToken.empty() && !outAgentId.empty();
 }
 
-bool NetworkClient::SendHeartbeat(const std::string& token, const TelemetryData& data) {
+bool NetworkClient::SendHeartbeat(const std::string& token, const TelemetryData& data, std::vector<AgentCommand>& outCommands) {
+    outCommands.clear();
+
     nlohmann::json payload = {
         {"token", token},
         {"cpuUsage", data.cpuUsage * 100.0},
@@ -80,6 +82,18 @@ bool NetworkClient::SendHeartbeat(const std::string& token, const TelemetryData&
     if (response.status_code >= 400) {
         std::cerr << "[Agent] heartbeat failed with HTTP " << response.status_code << std::endl;
         return false;
+    }
+
+    auto json = nlohmann::json::parse(response.text, nullptr, false);
+    if (!json.is_discarded() && json.contains("commands") && json["commands"].is_array()) {
+        for (const auto& item : json["commands"]) {
+            AgentCommand command;
+            command.id = item.value("id", 0);
+            command.type = item.value("type", "");
+            if (command.id > 0 && !command.type.empty()) {
+                outCommands.push_back(std::move(command));
+            }
+        }
     }
 
     return true;

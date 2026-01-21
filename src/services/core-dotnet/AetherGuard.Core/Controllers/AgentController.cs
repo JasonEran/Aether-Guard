@@ -67,9 +67,27 @@ public class AgentController : ControllerBase
 
         agent.LastHeartbeat = DateTimeOffset.UtcNow;
         agent.Status = "ONLINE";
+
+        var pendingCommands = await _context.AgentCommands
+            .Where(command => command.AgentId == agent.Id && command.Status == "PENDING")
+            .OrderBy(command => command.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        if (pendingCommands.Count > 0)
+        {
+            foreach (var command in pendingCommands)
+            {
+                command.Status = "SENT";
+            }
+        }
+
         await _context.SaveChangesAsync(cancellationToken);
 
-        return Ok(new { status = "active", commands = Array.Empty<object>() });
+        var commandPayload = pendingCommands
+            .Select(command => new { id = command.Id, type = command.CommandType })
+            .ToArray();
+
+        return Ok(new { status = "active", commands = commandPayload });
     }
 
     public sealed class RegisterAgentRequest

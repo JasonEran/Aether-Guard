@@ -25,6 +25,21 @@ export interface TelemetryRecord {
   timestamp: string;
 }
 
+export async function sendCommand(agentId: string, type: string): Promise<void> {
+  const response = await fetch(`http://localhost:5000/api/v1/agents/${agentId}/commands`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ type }),
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || 'Command request failed.');
+  }
+}
+
 export async function fetchLatestTelemetry(): Promise<DashboardData | null> {
   try {
     const response = await fetch('http://localhost:5000/api/v1/dashboard/latest', {

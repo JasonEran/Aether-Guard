@@ -11,6 +11,7 @@ public class ApplicationDbContext : DbContext
     }
 
     public DbSet<Agent> Agents => Set<Agent>();
+    public DbSet<AgentCommand> AgentCommands => Set<AgentCommand>();
     public DbSet<TelemetryRecord> TelemetryRecords => Set<TelemetryRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -39,6 +40,16 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.RootCause).HasColumnName("RootCause");
             entity.Property(e => e.PredictedCpu).HasColumnName("PredictedCpu");
             entity.Property(e => e.Timestamp).HasColumnName("Timestamp");
+        });
+
+        modelBuilder.Entity<AgentCommand>(entity =>
+        {
+            entity.ToTable("agent_commands");
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.AgentId).HasColumnName("agent_id");
+            entity.Property(e => e.CommandType).HasColumnName("command_type");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
         });
     }
 }

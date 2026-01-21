@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { fetchHistory, fetchLatestTelemetry, DashboardData, TelemetryRecord } from '../lib/api';
+import ControlPanel from '../components/ControlPanel';
 import HistoryChart from '../components/HistoryChart';
 import { handleSignOut } from './actions';
 
@@ -157,6 +158,10 @@ export default function Page() {
         <div className="md:col-span-3 rounded-2xl border border-slate-800 bg-slate-900 p-6">
           <div className="text-sm uppercase tracking-wide text-slate-400">Last Updated</div>
           <div className="mt-3 text-2xl font-semibold">{lastUpdated}</div>
+        </div>
+
+        <div className="md:col-span-3">
+          <ControlPanel agentId={data.telemetry.agentId} />
         </div>
       </section>
 

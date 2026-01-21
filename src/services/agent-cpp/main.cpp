@@ -2,10 +2,12 @@
 #include "SysMonitor.hpp"
 
 #include <chrono>
+#include <cstdlib>
 #include <iomanip>
 #include <iostream>
 #include <thread>
 #include <unistd.h>
+#include <vector>
 
 int main() {
     std::cout << "Aether Agent Starting..." << std::endl;
@@ -34,7 +36,8 @@ int main() {
 
     while (true) {
         TelemetryData data = monitor.collect();
-        bool heartbeatSent = client.SendHeartbeat(token, data);
+        std::vector<AgentCommand> commands;
+        bool heartbeatSent = client.SendHeartbeat(token, data, commands);
         bool telemetrySent = client.SendTelemetry(data);
         double cpuPercent = data.cpuUsage * 100.0;
 
@@ -50,6 +53,13 @@ int main() {
                       << data.memoryUsage << "%" << std::endl;
         } else {
             std::cerr << "[Agent] Failed to send telemetry" << std::endl;
+        }
+
+        for (const auto& command : commands) {
+            if (command.type == "RESTART") {
+                std::cerr << "[WARN] Received Remote Restart Command!" << std::endl;
+                std::exit(1);
+            }
         }
 
         std::this_thread::sleep_for(std::chrono::seconds(5));
