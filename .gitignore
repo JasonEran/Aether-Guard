@@ -59,6 +59,7 @@ coverage/
 
 # Environment files
 .env*
+!.env.example
 
 # Docker
 *.tar

@@ -46,6 +46,12 @@ public class CommandController : ControllerBase
             return BadRequest(new { error = "Command type is required." });
         }
 
+        var commandType = request.Type.Trim().ToUpperInvariant();
+        if (commandType != "RESTART")
+        {
+            return BadRequest(new { error = "Unsupported command type." });
+        }
+
         var agentExists = await _context.Agents.AnyAsync(agent => agent.Id == agentId, cancellationToken);
         if (!agentExists)
         {
@@ -55,7 +61,7 @@ public class CommandController : ControllerBase
         var command = new AgentCommand
         {
             AgentId = agentId,
-            CommandType = request.Type.Trim().ToUpperInvariant(),
+            CommandType = commandType,
             Status = "PENDING",
             CreatedAt = DateTime.UtcNow
         };
