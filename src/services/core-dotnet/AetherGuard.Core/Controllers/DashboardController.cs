@@ -38,8 +38,9 @@ public class DashboardController : ControllerBase
         var response = new DashboardLatestDto(
             new DashboardTelemetryDto(
                 latest.Telemetry.AgentId,
-                latest.Telemetry.CpuUsage,
-                latest.Telemetry.MemoryUsage,
+                latest.Telemetry.WorkloadTier,
+                latest.Telemetry.RebalanceSignal,
+                latest.Telemetry.DiskAvailable,
                 latest.Telemetry.Timestamp),
             analysis);
 
@@ -55,8 +56,9 @@ public class DashboardController : ControllerBase
             .Select(record => new TelemetryHistoryDto(
                 record.Id,
                 record.AgentId,
-                record.CpuUsage,
-                record.MemoryUsage,
+                record.WorkloadTier,
+                record.RebalanceSignal,
+                record.DiskAvailable,
                 record.AiStatus,
                 record.AiConfidence,
                 ClampPrediction(record.PredictedCpu),
@@ -75,8 +77,9 @@ public class DashboardController : ControllerBase
 
     private sealed record DashboardTelemetryDto(
         string AgentId,
-        double CpuUsage,
-        double MemoryUsage,
+        string WorkloadTier,
+        bool RebalanceSignal,
+        long DiskAvailable,
         long Timestamp);
 
     private sealed record DashboardAnalysisDto(
@@ -88,8 +91,9 @@ public class DashboardController : ControllerBase
     private sealed record TelemetryHistoryDto(
         long Id,
         string AgentId,
-        double CpuUsage,
-        double MemoryUsage,
+        string WorkloadTier,
+        bool RebalanceSignal,
+        long DiskAvailable,
         string AiStatus,
         double AiConfidence,
         double? PredictedCpu,

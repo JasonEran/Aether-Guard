@@ -25,7 +25,7 @@ FetchContent_MakeAvailable(nlohmann_json cpr)
 
 add_executable(AetherAgent
     main.cpp
-    SysMonitor.cpp
+    LifecycleManager.cpp
     NetworkClient.cpp
 )
 

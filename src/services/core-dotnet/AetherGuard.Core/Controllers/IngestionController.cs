@@ -43,16 +43,22 @@ public class IngestionController : ControllerBase
             return BadRequest("Timestamp is required.");
         }
 
-        if (payload.CpuUsage < 0 || payload.CpuUsage > 100)
+        if (string.IsNullOrWhiteSpace(payload.WorkloadTier))
         {
-            _logger.LogWarning("Received invalid CPU data from {AgentId}", payload.AgentId);
-            return BadRequest("Invalid CPU Usage value.");
+            return BadRequest("WorkloadTier is required.");
         }
 
-        if (payload.MemoryUsage < 0 || payload.MemoryUsage > 100)
+        var tier = payload.WorkloadTier.Trim().ToUpperInvariant();
+        if (tier is not ("T1" or "T2" or "T3"))
         {
-            _logger.LogWarning("Received invalid memory data from {AgentId}", payload.AgentId);
-            return BadRequest("Invalid Memory Usage value.");
+            _logger.LogWarning("Received invalid tier data from {AgentId}", payload.AgentId);
+            return BadRequest("Invalid WorkloadTier value.");
+        }
+
+        if (payload.DiskAvailable < 0)
+        {
+            _logger.LogWarning("Received invalid disk data from {AgentId}", payload.AgentId);
+            return BadRequest("Invalid DiskAvailable value.");
         }
 
         var dedupKey = $"dedup:{payload.AgentId}:{payload.Timestamp}";

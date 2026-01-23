@@ -56,23 +56,32 @@ bool NetworkClient::Register(const std::string& hostname, std::string& outToken,
     return !outToken.empty() && !outAgentId.empty();
 }
 
-bool NetworkClient::SendHeartbeat(const std::string& token, const TelemetryData& data, std::vector<AgentCommand>& outCommands) {
+bool NetworkClient::SendHeartbeat(
+    const std::string& token,
+    const std::string& agentId,
+    const std::string& state,
+    const std::string& tier,
+    std::vector<AgentCommand>& outCommands) {
     outCommands.clear();
 
     nlohmann::json payload = {
-        {"token", token},
-        {"cpuUsage", data.cpuUsage * 100.0},
-        {"memoryUsage", data.memoryUsage},
-        {"timestamp", data.timestamp}
+        {"agentId", agentId},
+        {"state", state},
+        {"tier", tier}
     };
+    if (!token.empty()) {
+        payload["token"] = token;
+    }
+
+    cpr::Header headers{{"Content-Type", "application/json"}};
+    if (!token.empty()) {
+        headers["Authorization"] = "Bearer " + token;
+    }
 
     cpr::Response response = cpr::Post(
         cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/heartbeat")},
         cpr::Body{payload.dump()},
-        cpr::Header{
-            {"Content-Type", "application/json"},
-            {"Authorization", "Bearer " + token}
-        });
+        headers);
 
     if (response.error.code != cpr::ErrorCode::OK) {
         std::cerr << "[Agent] heartbeat failed: " << response.error.message << std::endl;
@@ -94,34 +103,6 @@ bool NetworkClient::SendHeartbeat(const std::string& token, const TelemetryData&
                 outCommands.push_back(std::move(command));
             }
         }
-    }
-
-    return true;
-}
-
-bool NetworkClient::SendTelemetry(const TelemetryData& data) {
-    nlohmann::json payload = {
-        {"agentId", data.agentId},
-        {"cpuUsage", data.cpuUsage * 100.0},
-        {"memoryUsage", data.memoryUsage},
-        {"timestamp", data.timestamp},
-        {"diskIoUsage", 0.0},
-        {"metadata", ""}
-    };
-
-    cpr::Response response = cpr::Post(
-        cpr::Url{BuildUrl(baseUrl_, "/api/v1/ingestion")},
-        cpr::Body{payload.dump()},
-        cpr::Header{{"Content-Type", "application/json"}});
-
-    if (response.error.code != cpr::ErrorCode::OK) {
-        std::cerr << "[Agent] telemetry failed: " << response.error.message << std::endl;
-        return false;
-    }
-
-    if (response.status_code >= 400) {
-        std::cerr << "[Agent] telemetry failed with HTTP " << response.status_code << std::endl;
-        return false;
     }
 
     return true;

@@ -1,32 +1,27 @@
 import logging
-from pathlib import Path
-from typing import List
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
 
-from model import LSTMPredictor
+from model import RiskScorer
 
 logger = logging.getLogger("uvicorn.error")
 app = FastAPI()
-MODEL_PATH = Path(__file__).resolve().parent / "model.pth"
+scorer = RiskScorer()
 
 
-class TelemetryItem(BaseModel):
-    cpuUsage: float
-    memoryUsage: float
-    timestamp: int | None = None
+class RiskPayload(BaseModel):
+    spot_price_history: list[float] = Field(default_factory=list, alias="spotPriceHistory")
+    rebalance_signal: bool = Field(alias="rebalanceSignal")
+    capacity_score: float = Field(alias="capacityScore")
+
+    class Config:
+        allow_population_by_field_name = True
 
 
 @app.on_event("startup")
 def load_model() -> None:
-    model = LSTMPredictor()
-    if not MODEL_PATH.exists():
-        raise RuntimeError("model.pth not found. Run init_model.py to generate initial weights.")
-    logger.info("Loading LSTM model from %s...", MODEL_PATH.name)
-    model.load(MODEL_PATH)
-    logger.info("Model loaded successfully.")
-    app.state.model = model
+    app.state.scorer = scorer
     logger.info("AI Engine Online.")
 
 
@@ -36,29 +31,21 @@ def root() -> dict:
 
 
 @app.post("/analyze")
-def analyze(payload: List[TelemetryItem] | TelemetryItem) -> dict:
-    if isinstance(payload, TelemetryItem):
-        payload = [payload]
+def analyze(payload: RiskPayload) -> dict:
+    scorer: RiskScorer = app.state.scorer
+    assessment = scorer.assess_risk(
+        payload.spot_price_history,
+        payload.rebalance_signal,
+        payload.capacity_score,
+    )
 
-    if not payload:
-        raise HTTPException(status_code=400, detail="Telemetry sequence is required.")
-
-    model: LSTMPredictor = app.state.model
-    sequence = [[item.cpuUsage, item.memoryUsage] for item in payload]
-    prediction = model.predict(sequence)
-
-    last_memory = payload[-1].memoryUsage
-    status = "Critical" if prediction > 85.0 else "Normal"
-    confidence = 0.95 if status == "Critical" else 0.99
-    rca = "No anomaly detected"
-
-    if prediction > 85.0 and last_memory > 80.0:
-        rca = "Potential Memory Leak detected"
-    elif prediction > 85.0 and last_memory < 30.0:
-        rca = "Compute Bound Process detected"
+    priority = assessment.Priority
+    prediction = 100.0 if priority == "CRITICAL" else 0.0
+    confidence = 0.95 if priority == "CRITICAL" else 0.8
+    rca = "Rebalance signal asserted" if priority == "CRITICAL" else "Stable capacity"
 
     return {
-        "status": status,
+        "status": priority,
         "prediction": prediction,
         "rca": rca,
         "confidence": confidence,

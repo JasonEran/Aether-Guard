@@ -1,9 +1,8 @@
+#include "LifecycleManager.hpp"
 #include "NetworkClient.hpp"
-#include "SysMonitor.hpp"
 
 #include <chrono>
 #include <cstdlib>
-#include <iomanip>
 #include <iostream>
 #include <thread>
 #include <unistd.h>
@@ -12,8 +11,8 @@
 int main() {
     std::cout << "Aether Agent Starting..." << std::endl;
 
-    SysMonitor monitor;
     NetworkClient client("http://core-service:8080");
+    LifecycleManager lifecycle;
 
     std::string hostname = "unknown-host";
     char hostnameBuffer[256] = {};
@@ -25,7 +24,6 @@ int main() {
     std::string agentId;
     while (token.empty() || agentId.empty()) {
         if (client.Register(hostname, token, agentId)) {
-            monitor.SetAgentId(agentId);
             std::cout << "[Agent] Registered with Core. Token acquired." << std::endl;
             break;
         }
@@ -34,12 +32,17 @@ int main() {
         std::this_thread::sleep_for(std::chrono::seconds(5));
     }
 
+    const bool preflightOk = lifecycle.PreFlightCheck();
+    if (!preflightOk) {
+        std::cerr << "[Agent] Pre-flight check failed. Proceeding with heartbeat in IDLE state." << std::endl;
+    }
+
+    const std::string tier = "T2";
+    const std::string state = "IDLE";
+
     while (true) {
-        TelemetryData data = monitor.collect();
         std::vector<AgentCommand> commands;
-        bool heartbeatSent = client.SendHeartbeat(token, data, commands);
-        bool telemetrySent = client.SendTelemetry(data);
-        double cpuPercent = data.cpuUsage * 100.0;
+        bool heartbeatSent = client.SendHeartbeat(token, agentId, state, tier, commands);
 
         if (heartbeatSent) {
             std::cout << "[Agent] Heartbeat sent." << std::endl;
@@ -47,19 +50,8 @@ int main() {
             std::cerr << "[Agent] Failed to send heartbeat" << std::endl;
         }
 
-        if (telemetrySent) {
-            std::cout << std::fixed << std::setprecision(1)
-                      << "[Agent] Telemetry sent: CPU: " << cpuPercent << "% | Mem: "
-                      << data.memoryUsage << "%" << std::endl;
-        } else {
-            std::cerr << "[Agent] Failed to send telemetry" << std::endl;
-        }
-
-        for (const auto& command : commands) {
-            if (command.type == "RESTART") {
-                std::cerr << "[WARN] Received Remote Restart Command!" << std::endl;
-                std::exit(1);
-            }
+        if (!commands.empty()) {
+            std::cout << "[Agent] Received " << commands.size() << " pending command(s)." << std::endl;
         }
 
         std::this_thread::sleep_for(std::chrono::seconds(5));

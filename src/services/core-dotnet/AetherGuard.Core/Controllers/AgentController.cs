@@ -84,7 +84,14 @@ public class AgentController : ControllerBase
         await _context.SaveChangesAsync(cancellationToken);
 
         var commandPayload = pendingCommands
-            .Select(command => new { id = command.Id, type = command.CommandType })
+            .Select(command => new
+            {
+                id = command.Id,
+                type = command.CommandType,
+                nonce = command.Nonce,
+                signature = command.Signature,
+                expiresAt = command.ExpiresAt
+            })
             .ToArray();
 
         return Ok(new { status = "active", commands = commandPayload });

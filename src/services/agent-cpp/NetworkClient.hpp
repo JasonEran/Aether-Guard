@@ -1,7 +1,5 @@
 #pragma once
 
-#include "SysMonitor.hpp"
-
 #include <string>
 #include <vector>
 
@@ -15,8 +13,12 @@ public:
     explicit NetworkClient(std::string baseUrl);
 
     bool Register(const std::string& hostname, std::string& outToken, std::string& outAgentId);
-    bool SendHeartbeat(const std::string& token, const TelemetryData& data, std::vector<AgentCommand>& outCommands);
-    bool SendTelemetry(const TelemetryData& data);
+    bool SendHeartbeat(
+        const std::string& token,
+        const std::string& agentId,
+        const std::string& state,
+        const std::string& tier,
+        std::vector<AgentCommand>& outCommands);
 
 private:
     std::string baseUrl_;

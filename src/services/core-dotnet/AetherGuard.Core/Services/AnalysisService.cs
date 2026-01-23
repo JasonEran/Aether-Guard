@@ -1,8 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using AetherGuard.Core.Data;
 using AetherGuard.Core.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace AetherGuard.Core.Services;
 
@@ -20,44 +18,26 @@ public class AnalysisService
 
     private readonly HttpClient _httpClient;
     private readonly ILogger<AnalysisService> _logger;
-    private readonly ApplicationDbContext _context;
-
     public AnalysisService(
         HttpClient httpClient,
-        ILogger<AnalysisService> logger,
-        ApplicationDbContext context)
+        ILogger<AnalysisService> logger)
     {
         _httpClient = httpClient;
         _logger = logger;
-        _context = context;
     }
 
     public async Task<AnalysisResult> AnalyzeAsync(TelemetryPayload payload)
     {
-        var history = await _context.TelemetryRecords
-            .AsNoTracking()
-            .Where(record => record.AgentId == payload.AgentId)
-            .OrderByDescending(record => record.Timestamp)
-            .Take(9)
-            .ToListAsync();
-
-        if (history.Count < 9)
-        {
-            _logger.LogInformation("Insufficient telemetry history for agent {AgentId}", payload.AgentId);
-            return CreateFallbackResult();
-        }
-
-        history.Reverse();
-        var sequence = history
-            .Select(record => new TelemetrySample(record.CpuUsage, record.MemoryUsage))
-            .ToList();
-        sequence.Add(new TelemetrySample(payload.CpuUsage, payload.MemoryUsage));
+        var request = new RiskRequest(
+            SpotPriceHistory: Array.Empty<double>(),
+            RebalanceSignal: payload.RebalanceSignal,
+            CapacityScore: ConvertToCapacityScore(payload.DiskAvailable));
 
         try
         {
             using var response = await _httpClient.PostAsJsonAsync(
                 "http://ai-service:8000/analyze",
-                sequence,
+                request,
                 RequestJsonOptions);
             if (!response.IsSuccessStatusCode)
             {
@@ -93,5 +73,11 @@ public class AnalysisService
     private static AnalysisResult NormalizePrediction(AnalysisResult result)
         => result with { Prediction = Math.Clamp(result.Prediction, 0, 100) };
 
-    private sealed record TelemetrySample(double CpuUsage, double MemoryUsage);
+    private static double ConvertToCapacityScore(long diskAvailableBytes)
+        => diskAvailableBytes / (1024.0 * 1024.0 * 1024.0);
+
+    private sealed record RiskRequest(
+        IReadOnlyList<double> SpotPriceHistory,
+        bool RebalanceSignal,
+        double CapacityScore);
 }

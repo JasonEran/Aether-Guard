@@ -63,6 +63,9 @@ public class CommandController : ControllerBase
             AgentId = agentId,
             CommandType = commandType,
             Status = "PENDING",
+            Nonce = Guid.NewGuid().ToString("N"),
+            Signature = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+            ExpiresAt = DateTime.UtcNow.AddMinutes(10),
             CreatedAt = DateTime.UtcNow
         };
 

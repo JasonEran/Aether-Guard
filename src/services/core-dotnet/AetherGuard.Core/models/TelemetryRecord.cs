@@ -13,11 +13,14 @@ public class TelemetryRecord
     [Column("AgentId")]
     public string AgentId { get; set; } = string.Empty;
 
-    [Column("CpuUsage")]
-    public double CpuUsage { get; set; }
+    [Column("WorkloadTier")]
+    public string WorkloadTier { get; set; } = "T2";
 
-    [Column("MemoryUsage")]
-    public double MemoryUsage { get; set; }
+    [Column("RebalanceSignal")]
+    public bool RebalanceSignal { get; set; }
+
+    [Column("DiskAvailable")]
+    public long DiskAvailable { get; set; }
 
     [Column("AiStatus")]
     public string AiStatus { get; set; } = string.Empty;

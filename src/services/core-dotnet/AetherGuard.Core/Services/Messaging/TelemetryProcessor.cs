@@ -99,8 +99,9 @@ public sealed class TelemetryProcessor : BackgroundService
                 var record = new TelemetryRecord
                 {
                     AgentId = payload.AgentId,
-                    CpuUsage = payload.CpuUsage,
-                    MemoryUsage = payload.MemoryUsage,
+                    WorkloadTier = payload.WorkloadTier,
+                    RebalanceSignal = payload.RebalanceSignal,
+                    DiskAvailable = payload.DiskAvailable,
                     AiStatus = status,
                     AiConfidence = confidence,
                     RootCause = analysis.RootCause,

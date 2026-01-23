@@ -1,16 +1,5 @@
-from pathlib import Path
-
-import torch
-
-from model import LSTMPredictor
-
-
 def main() -> None:
-    model = LSTMPredictor()
-    model_path = Path(__file__).resolve().parent / "model.pth"
-    model_path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(model.state_dict(), model_path)
-    print(f"Initialized model weights at {model_path}")
+    print("RiskScorer does not require model weights.")
 
 
 if __name__ == "__main__":

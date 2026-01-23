@@ -20,6 +20,15 @@ public class AgentCommand
     [Column("status")]
     public string Status { get; set; } = "PENDING";
 
+    [Column("nonce")]
+    public string Nonce { get; set; } = string.Empty;
+
+    [Column("signature")]
+    public string Signature { get; set; } = string.Empty;
+
+    [Column("expires_at")]
+    public DateTime ExpiresAt { get; set; }
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; }
 }
