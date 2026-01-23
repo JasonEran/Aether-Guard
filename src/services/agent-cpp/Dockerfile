@@ -16,6 +16,7 @@ WORKDIR /src
 COPY CMakeLists.txt .
 COPY *.cpp .
 COPY *.hpp .
+COPY tests ./tests
 
 RUN cmake . && make
 

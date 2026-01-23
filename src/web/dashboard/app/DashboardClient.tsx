@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { signOut } from 'next-auth/react';
 
 import AuditLogStream from '../components/AuditLogStream';
@@ -16,73 +16,73 @@ interface DashboardClientProps {
 
 type FleetEntry = Agent & { lastCheckpoint?: string };
 
+const MOCK_PAYLOAD = (() => {
+  const baseTime = Date.parse('2025-01-01T00:00:00.000Z');
+  const timestamps = Array.from({ length: 12 }, (_, index) => new Date(baseTime - (11 - index) * 60_000));
+  const mockHistory: RiskPoint[] = timestamps.map((timestamp, index) => ({
+    timestamp: timestamp.toISOString(),
+    riskScore: index < 5 ? 0.35 : index < 9 ? 0.62 : 0.86,
+  }));
+
+  const mockAgents: FleetEntry[] = [
+    {
+      agentId: 'node-atlas-01',
+      status: 'IDLE',
+      tier: 'T1',
+      riskScore: 0.18,
+      lastHeartbeat: new Date(baseTime - 45_000).toISOString(),
+      lastCheckpoint: new Date(baseTime - 12 * 60_000).toISOString(),
+    },
+    {
+      agentId: 'node-zephyr-07',
+      status: 'MIGRATING',
+      tier: 'T2',
+      riskScore: 0.87,
+      lastHeartbeat: new Date(baseTime - 30_000).toISOString(),
+      lastCheckpoint: new Date(baseTime - 2 * 60_000).toISOString(),
+    },
+    {
+      agentId: 'node-sigma-12',
+      status: 'FAILED',
+      tier: 'T3',
+      riskScore: 0.95,
+      lastHeartbeat: new Date(baseTime - 8 * 60_000).toISOString(),
+      lastCheckpoint: new Date(baseTime - 30 * 60_000).toISOString(),
+    },
+  ];
+
+  const mockAudits: AuditLog[] = [
+    {
+      id: 'audit-01',
+      action: 'Migration Completed',
+      agentId: 'node-zephyr-07',
+      result: 'Restored on node-atlas-01',
+      timestamp: new Date(baseTime - 90_000).toISOString(),
+    },
+    {
+      id: 'audit-02',
+      action: 'Checkpoint Created',
+      agentId: 'node-zephyr-07',
+      result: 'Snapshot stored in relay vault',
+      timestamp: new Date(baseTime - 2 * 60_000).toISOString(),
+    },
+    {
+      id: 'audit-03',
+      action: 'Risk Scan Updated',
+      agentId: 'node-sigma-12',
+      result: 'Priority raised to CRITICAL',
+      timestamp: new Date(baseTime - 4 * 60_000).toISOString(),
+    },
+  ];
+
+  return { mockHistory, mockAgents, mockAudits };
+})();
+
 export default function DashboardClient({ userName, userRole }: DashboardClientProps) {
   const [agents, setAgents] = useState<FleetEntry[]>([]);
   const [history, setHistory] = useState<RiskPoint[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [usingMock, setUsingMock] = useState(false);
-
-  const mockPayload = useMemo(() => {
-    const now = Date.now();
-    const timestamps = Array.from({ length: 12 }, (_, index) => new Date(now - (11 - index) * 60_000));
-    const mockHistory: RiskPoint[] = timestamps.map((timestamp, index) => ({
-      timestamp: timestamp.toISOString(),
-      riskScore: index < 5 ? 0.35 : index < 9 ? 0.62 : 0.86,
-    }));
-
-    const mockAgents: FleetEntry[] = [
-      {
-        agentId: 'node-atlas-01',
-        status: 'IDLE',
-        tier: 'T1',
-        riskScore: 0.18,
-        lastHeartbeat: new Date(now - 45_000).toISOString(),
-        lastCheckpoint: new Date(now - 12 * 60_000).toISOString(),
-      },
-      {
-        agentId: 'node-zephyr-07',
-        status: 'MIGRATING',
-        tier: 'T2',
-        riskScore: 0.87,
-        lastHeartbeat: new Date(now - 30_000).toISOString(),
-        lastCheckpoint: new Date(now - 2 * 60_000).toISOString(),
-      },
-      {
-        agentId: 'node-sigma-12',
-        status: 'FAILED',
-        tier: 'T3',
-        riskScore: 0.95,
-        lastHeartbeat: new Date(now - 8 * 60_000).toISOString(),
-        lastCheckpoint: new Date(now - 30 * 60_000).toISOString(),
-      },
-    ];
-
-    const mockAudits: AuditLog[] = [
-      {
-        id: 'audit-01',
-        action: 'Migration Completed',
-        agentId: 'node-zephyr-07',
-        result: 'Restored on node-atlas-01',
-        timestamp: new Date(now - 90_000).toISOString(),
-      },
-      {
-        id: 'audit-02',
-        action: 'Checkpoint Created',
-        agentId: 'node-zephyr-07',
-        result: 'Snapshot stored in relay vault',
-        timestamp: new Date(now - 2 * 60_000).toISOString(),
-      },
-      {
-        id: 'audit-03',
-        action: 'Risk Scan Updated',
-        agentId: 'node-sigma-12',
-        result: 'Priority raised to CRITICAL',
-        timestamp: new Date(now - 4 * 60_000).toISOString(),
-      },
-    ];
-
-    return { mockHistory, mockAgents, mockAudits };
-  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -100,19 +100,20 @@ export default function DashboardClient({ userName, userRole }: DashboardClientP
 
       const useMock = fleetData.length === 0 || historyData.length === 0 || auditData.length === 0;
       setUsingMock(useMock);
-      setAgents(
-        (fleetData.length ? fleetData : mockPayload.mockAgents).map((agent) => ({
-          ...agent,
-          lastCheckpoint: agent.lastCheckpoint ?? agent.lastHeartbeat,
-        })),
-      );
-      setHistory(historyData.length ? historyData : mockPayload.mockHistory);
-      const auditPool = (auditData.length ? auditData : mockPayload.mockAudits).slice(0, 12);
+      const fleetSource: FleetEntry[] = fleetData.length
+        ? fleetData.map((agent) => ({
+            ...agent,
+            lastCheckpoint: agent.lastHeartbeat,
+          }))
+        : MOCK_PAYLOAD.mockAgents;
+      setAgents(fleetSource);
+      setHistory(historyData.length ? historyData : MOCK_PAYLOAD.mockHistory);
+      const auditPool = (auditData.length ? auditData : MOCK_PAYLOAD.mockAudits).slice(0, 12);
       const hasMigration = auditPool.some((log) => log.action === 'Migration Completed');
       setAuditLogs(
         hasMigration
           ? auditPool
-          : [mockPayload.mockAudits[0], ...auditPool].slice(0, 12),
+          : [MOCK_PAYLOAD.mockAudits[0], ...auditPool].slice(0, 12),
       );
     };
 
@@ -123,7 +124,7 @@ export default function DashboardClient({ userName, userRole }: DashboardClientP
       isMounted = false;
       clearInterval(intervalId);
     };
-  }, [mockPayload]);
+  }, []);
 
   const handleSimulateChaos = async () => {
     await sendChaosSignal();
