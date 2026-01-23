@@ -48,6 +48,11 @@ void CommandDispatcher::Dispatch(const CommandPayload& command) {
         }
 
         const std::string snapshotPath = lifecycle_.Checkpoint(workloadId);
+        if (snapshotPath.empty()) {
+            lifecycle_.Thaw(workloadId);
+            ReportResult(command, "FAILED", "Checkpoint failed", "Snapshot capture failed");
+            return;
+        }
         const std::string targetIp = parameters.value("targetIp", "");
         const bool transferred = lifecycle_.Transfer(snapshotPath, targetIp);
         const bool restored = lifecycle_.Restore(snapshotPath);
@@ -68,7 +73,11 @@ void CommandDispatcher::Dispatch(const CommandPayload& command) {
             return;
         }
 
-        lifecycle_.Checkpoint(workloadId);
+        const std::string snapshotPath = lifecycle_.Checkpoint(workloadId);
+        if (snapshotPath.empty()) {
+            ReportResult(command, "FAILED", "Freeze failed", "Snapshot capture failed");
+            return;
+        }
         ReportResult(command, "COMPLETED", "Frozen", "");
         return;
     }

@@ -38,6 +38,8 @@ public:
         std::vector<AgentCommand>& outCommands);
     bool PollCommands(const std::string& agentId, std::vector<CommandPayload>& outCommands);
     bool SendFeedback(const std::string& agentId, const CommandFeedback& feedback);
+    bool UploadSnapshot(const std::string& url, const std::string& filePath);
+    bool DownloadSnapshot(const std::string& url, const std::string& outputPath);
 
 private:
     std::string baseUrl_;

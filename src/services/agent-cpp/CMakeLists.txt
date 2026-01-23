@@ -24,6 +24,8 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(nlohmann_json cpr)
 
 add_executable(AetherAgent
+    ArchiveManager.cpp
+    CriuManager.cpp
     CommandDispatcher.cpp
     CommandPoller.cpp
     main.cpp
@@ -35,3 +37,18 @@ target_link_libraries(AetherAgent
     cpr::cpr
     nlohmann_json::nlohmann_json
 )
+
+enable_testing()
+
+add_executable(AetherAgentTests
+    ArchiveManager.cpp
+    CriuManager.cpp
+    tests/CriuCommandTests.cpp
+)
+
+target_include_directories(AetherAgentTests
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+add_test(NAME AetherAgentTests COMMAND AetherAgentTests)

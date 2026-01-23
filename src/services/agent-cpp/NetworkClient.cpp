@@ -3,6 +3,9 @@
 #include <cpr/cpr.h>
 #include <nlohmann/json.hpp>
 
+#include <filesystem>
+#include <system_error>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <utility>
@@ -184,4 +187,68 @@ bool NetworkClient::SendFeedback(const std::string& agentId, const CommandFeedba
     }
 
     return true;
+}
+
+bool NetworkClient::UploadSnapshot(const std::string& url, const std::string& filePath) {
+    if (url.empty() || filePath.empty()) {
+        return false;
+    }
+
+    if (!std::filesystem::exists(filePath)) {
+        std::cerr << "[Agent] upload failed: file not found " << filePath << std::endl;
+        return false;
+    }
+
+    cpr::Response response = cpr::Post(
+        cpr::Url{url},
+        cpr::Multipart{{"file", cpr::File{filePath}}});
+
+    if (response.error.code != cpr::ErrorCode::OK) {
+        std::cerr << "[Agent] upload failed: " << response.error.message << std::endl;
+        return false;
+    }
+
+    if (response.status_code >= 400) {
+        std::cerr << "[Agent] upload failed with HTTP " << response.status_code << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+bool NetworkClient::DownloadSnapshot(const std::string& url, const std::string& outputPath) {
+    if (url.empty() || outputPath.empty()) {
+        return false;
+    }
+
+    std::filesystem::path output = outputPath;
+    if (!output.parent_path().empty()) {
+        std::error_code error;
+        std::filesystem::create_directories(output.parent_path(), error);
+        if (error) {
+            std::cerr << "[Agent] download failed: " << error.message() << std::endl;
+            return false;
+        }
+    }
+
+    cpr::Response response = cpr::Get(cpr::Url{url});
+
+    if (response.error.code != cpr::ErrorCode::OK) {
+        std::cerr << "[Agent] download failed: " << response.error.message << std::endl;
+        return false;
+    }
+
+    if (response.status_code >= 400) {
+        std::cerr << "[Agent] download failed with HTTP " << response.status_code << std::endl;
+        return false;
+    }
+
+    std::ofstream outputFile(outputPath, std::ios::binary);
+    if (!outputFile) {
+        std::cerr << "[Agent] download failed: unable to write " << outputPath << std::endl;
+        return false;
+    }
+
+    outputFile.write(response.text.data(), static_cast<std::streamsize>(response.text.size()));
+    return outputFile.good();
 }

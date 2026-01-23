@@ -1,6 +1,11 @@
 #pragma once
 
+#include "ArchiveManager.hpp"
+#include "CriuManager.hpp"
+
 #include <string>
+
+class NetworkClient;
 
 enum class AgentState {
     IDLE,
@@ -13,9 +18,23 @@ enum class AgentState {
 
 class LifecycleManager {
 public:
+    LifecycleManager(NetworkClient& client, std::string orchestratorBaseUrl);
+
     bool PreFlightCheck() const;
-    std::string Checkpoint(const std::string& workloadId) const;
-    bool Transfer(const std::string& snapshotPath, const std::string& targetIp) const;
-    bool Restore(const std::string& snapshotPath) const;
-    bool Thaw(const std::string& workloadId) const;
+    std::string Checkpoint(const std::string& workloadId);
+    bool Transfer(const std::string& snapshotPath, const std::string& targetIp);
+    bool Restore(const std::string& snapshotPath);
+    bool Thaw(const std::string& workloadId);
+
+private:
+    static std::string BuildUrl(const std::string& baseUrl, const std::string& path);
+    static std::string FormatTimestamp();
+    static std::string SanitizeWorkloadId(const std::string& workloadId);
+    static std::string ExtractWorkloadId(const std::string& snapshotPath);
+    static int ParsePid(const std::string& workloadId);
+
+    NetworkClient& client_;
+    CriuManager criu_;
+    ArchiveManager archive_;
+    std::string orchestratorBaseUrl_;
 };

@@ -12,8 +12,9 @@
 int main() {
     std::cout << "Aether Agent Starting..." << std::endl;
 
-    NetworkClient client("http://core-service:8080");
-    LifecycleManager lifecycle;
+    const std::string coreUrl = "http://core-service:8080";
+    NetworkClient client(coreUrl);
+    LifecycleManager lifecycle(client, coreUrl);
 
     std::string hostname = "unknown-host";
     char hostnameBuffer[256] = {};
