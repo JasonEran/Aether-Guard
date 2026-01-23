@@ -63,3 +63,8 @@ coverage/
 
 # Docker
 *.tar
+
+# Local runtime artifacts
+Data/
+dummy_snapshot.tar.gz
+.compose.override.temp.yml

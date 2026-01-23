@@ -13,8 +13,10 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<TelemetryStore>();
 builder.Services.AddHttpClient<AnalysisService>();
 builder.Services.AddScoped<CommandService>();
+builder.Services.AddScoped<MigrationOrchestrator>();
 builder.Services.AddSingleton<IMessageProducer, RabbitMQProducer>();
 builder.Services.AddHostedService<TelemetryProcessor>();
+builder.Services.AddHostedService<MigrationCycleService>();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(connectionString))

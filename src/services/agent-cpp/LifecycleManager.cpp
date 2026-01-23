@@ -77,6 +77,7 @@ bool LifecycleManager::Restore(const std::string& snapshotPath) {
         return false;
     }
 
+    const bool isUrl = snapshotPath.rfind("http://", 0) == 0 || snapshotPath.rfind("https://", 0) == 0;
     const std::string workloadId = ExtractWorkloadId(snapshotPath);
     if (workloadId.empty()) {
         return false;
@@ -97,7 +98,9 @@ bool LifecycleManager::Restore(const std::string& snapshotPath) {
         return false;
     }
 
-    const std::string downloadUrl = BuildUrl(orchestratorBaseUrl_, "/download/" + workloadId);
+    const std::string downloadUrl = isUrl
+        ? snapshotPath
+        : BuildUrl(orchestratorBaseUrl_, "/download/" + workloadId);
     if (!client_.DownloadSnapshot(downloadUrl, archivePath.string())) {
         std::cerr << "[Agent] Snapshot download failed for workload " << workloadId << std::endl;
         return false;
@@ -157,6 +160,35 @@ std::string LifecycleManager::SanitizeWorkloadId(const std::string& workloadId) 
 }
 
 std::string LifecycleManager::ExtractWorkloadId(const std::string& snapshotPath) {
+    if (snapshotPath.rfind("http://", 0) == 0 || snapshotPath.rfind("https://", 0) == 0) {
+        auto pathStart = snapshotPath.find("://");
+        if (pathStart == std::string::npos) {
+            return {};
+        }
+
+        pathStart = snapshotPath.find('/', pathStart + 3);
+        if (pathStart == std::string::npos) {
+            return {};
+        }
+
+        std::string path = snapshotPath.substr(pathStart + 1);
+        const auto queryPos = path.find('?');
+        if (queryPos != std::string::npos) {
+            path = path.substr(0, queryPos);
+        }
+
+        while (!path.empty() && path.back() == '/') {
+            path.pop_back();
+        }
+
+        const auto lastSlash = path.find_last_of('/');
+        if (lastSlash != std::string::npos) {
+            return path.substr(lastSlash + 1);
+        }
+
+        return path;
+    }
+
     std::filesystem::path path(snapshotPath);
     if (!path.parent_path().empty()) {
         const std::string name = path.parent_path().filename().string();
@@ -164,7 +196,7 @@ std::string LifecycleManager::ExtractWorkloadId(const std::string& snapshotPath)
             return name;
         }
     }
-    return snapshotPath;
+    return path.filename().string();
 }
 
 int LifecycleManager::ParsePid(const std::string& workloadId) {
