@@ -1,3 +1,4 @@
+#include "CommandPoller.hpp"
 #include "LifecycleManager.hpp"
 #include "NetworkClient.hpp"
 
@@ -39,6 +40,9 @@ int main() {
 
     const std::string tier = "T2";
     const std::string state = "IDLE";
+    CommandDispatcher dispatcher(client, lifecycle, agentId);
+    CommandPoller poller(client, dispatcher, agentId);
+    poller.Start();
 
     while (true) {
         std::vector<AgentCommand> commands;

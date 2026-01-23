@@ -11,11 +11,20 @@ public class AgentCommand
     [Column("id")]
     public int Id { get; set; }
 
+    [Column("command_id")]
+    public Guid CommandId { get; set; }
+
     [Column("agent_id")]
     public Guid AgentId { get; set; }
 
-    [Column("command_type")]
-    public string CommandType { get; set; } = string.Empty;
+    [Column("workload_id")]
+    public string WorkloadId { get; set; } = string.Empty;
+
+    [Column("action")]
+    public string Action { get; set; } = string.Empty;
+
+    [Column("parameters")]
+    public string Parameters { get; set; } = "{}";
 
     [Column("status")]
     public string Status { get; set; } = "PENDING";
@@ -31,4 +40,7 @@ public class AgentCommand
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; }
+
+    [Column("updated_at")]
+    public DateTime? UpdatedAt { get; set; }
 }

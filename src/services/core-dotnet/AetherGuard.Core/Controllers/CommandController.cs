@@ -1,5 +1,5 @@
 using AetherGuard.Core.Data;
-using AetherGuard.Core.Models;
+using AetherGuard.Core.Services;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Mvc;
@@ -13,12 +13,18 @@ public class CommandController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<CommandController> _logger;
+    private readonly CommandService _commandService;
     private readonly string? _commandApiKey;
 
-    public CommandController(ApplicationDbContext context, IConfiguration configuration, ILogger<CommandController> logger)
+    public CommandController(
+        ApplicationDbContext context,
+        IConfiguration configuration,
+        ILogger<CommandController> logger,
+        CommandService commandService)
     {
         _context = context;
         _logger = logger;
+        _commandService = commandService;
         _commandApiKey = configuration["Security:CommandApiKey"];
     }
 
@@ -58,21 +64,13 @@ public class CommandController : ControllerBase
             return NotFound(new { error = "Agent not found." });
         }
 
-        var command = new AgentCommand
-        {
-            AgentId = agentId,
-            CommandType = commandType,
-            Status = "PENDING",
-            Nonce = Guid.NewGuid().ToString("N"),
-            Signature = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
-            ExpiresAt = DateTime.UtcNow.AddMinutes(10),
-            CreatedAt = DateTime.UtcNow
-        };
+        var command = await _commandService.QueueCommand(
+            agentId.ToString(),
+            commandType,
+            new { },
+            cancellationToken);
 
-        _context.AgentCommands.Add(command);
-        await _context.SaveChangesAsync(cancellationToken);
-
-        return Accepted(new { status = "queued", commandId = command.Id });
+        return Accepted(new { status = "queued", commandId = command.CommandId });
     }
 
     private static bool FixedTimeEquals(string left, string right)

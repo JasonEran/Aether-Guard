@@ -7,6 +7,10 @@ namespace AetherGuard.Core.Models;
 public class CommandAudit
 {
     [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    [Column("id")]
+    public long Id { get; set; }
+
     [Column("command_id")]
     public Guid CommandId { get; set; }
 

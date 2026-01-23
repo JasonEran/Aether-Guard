@@ -24,6 +24,8 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(nlohmann_json cpr)
 
 add_executable(AetherAgent
+    CommandDispatcher.cpp
+    CommandPoller.cpp
     main.cpp
     LifecycleManager.cpp
     NetworkClient.cpp

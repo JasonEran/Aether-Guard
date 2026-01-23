@@ -12,6 +12,7 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddSingleton<TelemetryStore>();
 builder.Services.AddHttpClient<AnalysisService>();
+builder.Services.AddScoped<CommandService>();
 builder.Services.AddSingleton<IMessageProducer, RabbitMQProducer>();
 builder.Services.AddHostedService<TelemetryProcessor>();
 

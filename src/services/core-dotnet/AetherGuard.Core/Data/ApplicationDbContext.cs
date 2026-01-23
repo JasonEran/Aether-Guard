@@ -49,18 +49,24 @@ public class ApplicationDbContext : DbContext
         {
             entity.ToTable("agent_commands");
             entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CommandId).HasColumnName("command_id");
             entity.Property(e => e.AgentId).HasColumnName("agent_id");
-            entity.Property(e => e.CommandType).HasColumnName("command_type");
+            entity.Property(e => e.WorkloadId).HasColumnName("workload_id");
+            entity.Property(e => e.Action).HasColumnName("action");
+            entity.Property(e => e.Parameters).HasColumnName("parameters");
             entity.Property(e => e.Status).HasColumnName("status");
             entity.Property(e => e.Nonce).HasColumnName("nonce");
             entity.Property(e => e.Signature).HasColumnName("signature");
             entity.Property(e => e.ExpiresAt).HasColumnName("expires_at");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
         });
 
         modelBuilder.Entity<CommandAudit>(entity =>
         {
             entity.ToTable("command_audits");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id").ValueGeneratedOnAdd();
             entity.Property(e => e.CommandId).HasColumnName("command_id");
             entity.Property(e => e.Actor).HasColumnName("actor");
             entity.Property(e => e.Action).HasColumnName("action");

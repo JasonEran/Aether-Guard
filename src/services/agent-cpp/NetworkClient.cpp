@@ -107,3 +107,81 @@ bool NetworkClient::SendHeartbeat(
 
     return true;
 }
+
+bool NetworkClient::PollCommands(const std::string& agentId, std::vector<CommandPayload>& outCommands) {
+    outCommands.clear();
+
+    if (agentId.empty()) {
+        return false;
+    }
+
+    cpr::Response response = cpr::Get(
+        cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/poll")},
+        cpr::Parameters{{"agentId", agentId}});
+
+    if (response.error.code != cpr::ErrorCode::OK) {
+        std::cerr << "[Agent] poll failed: " << response.error.message << std::endl;
+        return false;
+    }
+
+    if (response.status_code >= 400) {
+        std::cerr << "[Agent] poll failed with HTTP " << response.status_code << std::endl;
+        return false;
+    }
+
+    auto json = nlohmann::json::parse(response.text, nullptr, false);
+    if (json.is_discarded() || !json.contains("commands") || !json["commands"].is_array()) {
+        return true;
+    }
+
+    for (const auto& item : json["commands"]) {
+        CommandPayload command;
+        command.commandId = item.value("commandId", "");
+        command.workloadId = item.value("workloadId", "");
+        command.action = item.value("action", "");
+        command.nonce = item.value("nonce", "");
+        command.signature = item.value("signature", "");
+        command.expiresAt = item.value("expiresAt", "");
+
+        if (item.contains("parameters")) {
+            if (item["parameters"].is_string()) {
+                command.parameters = item.value("parameters", "");
+            } else {
+                command.parameters = item["parameters"].dump();
+            }
+        }
+
+        if (!command.commandId.empty()) {
+            outCommands.push_back(std::move(command));
+        }
+    }
+
+    return true;
+}
+
+bool NetworkClient::SendFeedback(const std::string& agentId, const CommandFeedback& feedback) {
+    nlohmann::json payload = {
+        {"agentId", agentId},
+        {"commandId", feedback.commandId},
+        {"status", feedback.status},
+        {"result", feedback.result},
+        {"error", feedback.error}
+    };
+
+    cpr::Response response = cpr::Post(
+        cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/feedback")},
+        cpr::Body{payload.dump()},
+        cpr::Header{{"Content-Type", "application/json"}});
+
+    if (response.error.code != cpr::ErrorCode::OK) {
+        std::cerr << "[Agent] feedback failed: " << response.error.message << std::endl;
+        return false;
+    }
+
+    if (response.status_code >= 400) {
+        std::cerr << "[Agent] feedback failed with HTTP " << response.status_code << std::endl;
+        return false;
+    }
+
+    return true;
+}
