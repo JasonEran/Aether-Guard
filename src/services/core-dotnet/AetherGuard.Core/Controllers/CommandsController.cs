@@ -32,8 +32,8 @@ public class CommandsController : ControllerBase
             return BadRequest(new { error = "Action is required." });
         }
 
-        var parameters = request.Params.ValueKind == JsonValueKind.Undefined
-            ? new { }
+        object parameters = request.Params.ValueKind == JsonValueKind.Undefined
+            ? new object()
             : request.Params;
 
         var command = await _commandService.QueueCommand(

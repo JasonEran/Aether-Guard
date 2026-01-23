@@ -82,8 +82,30 @@ void CommandDispatcher::Dispatch(const CommandPayload& command) {
         return;
     }
 
+    if (action == "CHECKPOINT") {
+        if (!lifecycle_.PreFlightCheck()) {
+            lifecycle_.Thaw(workloadId);
+            ReportResult(command, "FAILED", "Pre-flight check failed", "Pre-flight check failed");
+            return;
+        }
+
+        const std::string snapshotPath = lifecycle_.Checkpoint(workloadId);
+        if (snapshotPath.empty()) {
+            ReportResult(command, "FAILED", "Checkpoint failed", "Snapshot capture failed");
+            return;
+        }
+        ReportResult(command, "COMPLETED", "Checkpointed", "");
+        return;
+    }
+
     if (action == "RESTORE") {
-        const std::string snapshotPath = parameters.value("snapshotPath", "");
+        std::string snapshotPath = parameters.value("snapshotUrl", "");
+        if (snapshotPath.empty()) {
+            snapshotPath = parameters.value("downloadUrl", "");
+        }
+        if (snapshotPath.empty()) {
+            snapshotPath = parameters.value("snapshotPath", "");
+        }
         if (snapshotPath.empty()) {
             ReportResult(command, "FAILED", "Restore failed", "snapshotPath missing");
             return;
