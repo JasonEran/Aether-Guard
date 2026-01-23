@@ -1,184 +1,222 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { fetchHistory, fetchLatestTelemetry, DashboardData, TelemetryRecord } from '../lib/api';
-import ControlPanel from '../components/ControlPanel';
-import HistoryChart from '../components/HistoryChart';
+import { useEffect, useMemo, useState } from 'react';
 import { signOut } from 'next-auth/react';
 
-const ShieldIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.6"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <path d="M12 2l7 4v6c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-4z" />
-    <path d="M9 12l2 2 4-4" />
-  </svg>
-);
-
-const WarningIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.6"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <path d="M12 3l9 16H3l9-16z" />
-    <path d="M12 9v4" />
-    <path d="M12 17h.01" />
-  </svg>
-);
+import AuditLogStream from '../components/AuditLogStream';
+import ControlPanel from '../components/ControlPanel';
+import HistoryChart from '../components/HistoryChart';
+import { fetchAuditLogs, fetchFleetStatus, fetchRiskHistory, sendChaosSignal, RiskPoint } from '../lib/api';
+import type { Agent, AuditLog } from '../types';
 
 interface DashboardClientProps {
   userName: string;
   userRole: string;
 }
 
+type FleetEntry = Agent & { lastCheckpoint?: string };
+
 export default function DashboardClient({ userName, userRole }: DashboardClientProps) {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [history, setHistory] = useState<TelemetryRecord[]>([]);
+  const [agents, setAgents] = useState<FleetEntry[]>([]);
+  const [history, setHistory] = useState<RiskPoint[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [usingMock, setUsingMock] = useState(false);
+
+  const mockPayload = useMemo(() => {
+    const now = Date.now();
+    const timestamps = Array.from({ length: 12 }, (_, index) => new Date(now - (11 - index) * 60_000));
+    const mockHistory: RiskPoint[] = timestamps.map((timestamp, index) => ({
+      timestamp: timestamp.toISOString(),
+      riskScore: index < 5 ? 0.35 : index < 9 ? 0.62 : 0.86,
+    }));
+
+    const mockAgents: FleetEntry[] = [
+      {
+        agentId: 'node-atlas-01',
+        status: 'IDLE',
+        tier: 'T1',
+        riskScore: 0.18,
+        lastHeartbeat: new Date(now - 45_000).toISOString(),
+        lastCheckpoint: new Date(now - 12 * 60_000).toISOString(),
+      },
+      {
+        agentId: 'node-zephyr-07',
+        status: 'MIGRATING',
+        tier: 'T2',
+        riskScore: 0.87,
+        lastHeartbeat: new Date(now - 30_000).toISOString(),
+        lastCheckpoint: new Date(now - 2 * 60_000).toISOString(),
+      },
+      {
+        agentId: 'node-sigma-12',
+        status: 'FAILED',
+        tier: 'T3',
+        riskScore: 0.95,
+        lastHeartbeat: new Date(now - 8 * 60_000).toISOString(),
+        lastCheckpoint: new Date(now - 30 * 60_000).toISOString(),
+      },
+    ];
+
+    const mockAudits: AuditLog[] = [
+      {
+        id: 'audit-01',
+        action: 'Migration Completed',
+        agentId: 'node-zephyr-07',
+        result: 'Restored on node-atlas-01',
+        timestamp: new Date(now - 90_000).toISOString(),
+      },
+      {
+        id: 'audit-02',
+        action: 'Checkpoint Created',
+        agentId: 'node-zephyr-07',
+        result: 'Snapshot stored in relay vault',
+        timestamp: new Date(now - 2 * 60_000).toISOString(),
+      },
+      {
+        id: 'audit-03',
+        action: 'Risk Scan Updated',
+        agentId: 'node-sigma-12',
+        result: 'Priority raised to CRITICAL',
+        timestamp: new Date(now - 4 * 60_000).toISOString(),
+      },
+    ];
+
+    return { mockHistory, mockAgents, mockAudits };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
 
     const load = async () => {
-      const [latest, historyData] = await Promise.all([fetchLatestTelemetry(), fetchHistory()]);
-      if (isMounted) {
-        setData(latest);
-        setHistory(historyData);
+      const [fleetData, historyData, auditData] = await Promise.all([
+        fetchFleetStatus(),
+        fetchRiskHistory(),
+        fetchAuditLogs(),
+      ]);
+
+      if (!isMounted) {
+        return;
       }
+
+      const useMock = fleetData.length === 0 || historyData.length === 0 || auditData.length === 0;
+      setUsingMock(useMock);
+      setAgents(
+        (fleetData.length ? fleetData : mockPayload.mockAgents).map((agent) => ({
+          ...agent,
+          lastCheckpoint: agent.lastCheckpoint ?? agent.lastHeartbeat,
+        })),
+      );
+      setHistory(historyData.length ? historyData : mockPayload.mockHistory);
+      const auditPool = (auditData.length ? auditData : mockPayload.mockAudits).slice(0, 12);
+      const hasMigration = auditPool.some((log) => log.action === 'Migration Completed');
+      setAuditLogs(
+        hasMigration
+          ? auditPool
+          : [mockPayload.mockAudits[0], ...auditPool].slice(0, 12),
+      );
     };
 
     load();
-    const intervalId = setInterval(load, 1000);
+    const intervalId = setInterval(load, 5000);
 
     return () => {
       isMounted = false;
       clearInterval(intervalId);
     };
-  }, []);
+  }, [mockPayload]);
 
-  if (!data) {
+  const handleSimulateChaos = async () => {
+    await sendChaosSignal();
+    const timestamp = new Date().toISOString();
+
+    setAgents((prev) =>
+      prev.map((agent) =>
+        agent.tier === 'T2'
+          ? { ...agent, status: 'MIGRATING', riskScore: 0.92, lastHeartbeat: timestamp }
+          : agent,
+      ),
+    );
+
+    setHistory((prev) =>
+      prev.map((point, index) =>
+        index > prev.length - 4
+          ? { ...point, riskScore: Math.min(1, point.riskScore + 0.2) }
+          : point,
+      ),
+    );
+
+    setAuditLogs((prev) => [
+      {
+        id: `audit-${Date.now()}`,
+        action: 'Rebalance Signal Injected',
+        agentId: 'control-plane',
+        result: 'Chaos simulation engaged',
+        timestamp,
+      },
+      ...prev,
+    ]);
+  };
+
+  if (agents.length === 0) {
     return (
       <main className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-2xl font-semibold">Aether-Guard Live Monitor</div>
-          <div className="mt-4 text-slate-400">Connecting to Core...</div>
+          <div className="text-2xl font-semibold">Aether-Guard Mission Control</div>
+          <div className="mt-4 text-slate-400">Warming up orchestration grid...</div>
         </div>
       </main>
     );
   }
 
-  const cpuUsage = data.telemetry.cpuUsage;
-  const memoryUsage = data.telemetry.memoryUsage;
-  const cpuColor = cpuUsage > 80 ? 'text-red-400' : 'text-emerald-400';
-  const lastUpdated = new Date(data.telemetry.timestamp * 1000).toLocaleTimeString();
-
-  const analysisStatus = data.analysis?.status;
-  const isHealthy = analysisStatus === 'Normal';
-  const isCritical = analysisStatus === 'Critical';
-  const aiLabel = isCritical ? 'Risk Detected' : isHealthy ? 'Healthy' : 'Unknown';
-  const aiColor = isCritical ? 'text-red-400' : isHealthy ? 'text-emerald-400' : 'text-slate-400';
-  const confidence = data.analysis?.confidence;
-  const confidenceLabel =
-    typeof confidence === 'number' ? `Confidence: ${(confidence * 100).toFixed(0)}%` : 'Confidence: --';
-  const predictedCpu = data.analysis?.predictedCpu;
-  const predictedLabel =
-    typeof predictedCpu === 'number' ? `Forecast: ${predictedCpu.toFixed(1)}%` : 'Forecast: --';
-  const rootCause = data.analysis?.rootCause?.trim();
-  const rootCauseText =
-    rootCause && rootCause.length > 0 ? rootCause : 'System Healthy. No anomalies detected.';
-  const rootCauseColor =
-    rootCause && rootCause.length > 0 ? 'text-amber-400' : 'text-slate-500';
-
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 p-8">
-      <header className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
-            <h1 className="text-3xl font-semibold">Aether-Guard Live Monitor</h1>
+    <main className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="mx-auto max-w-6xl px-6 py-8">
+        <header className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3 text-sm uppercase tracking-[0.3em] text-slate-500">
+              Aether-Guard
+              <span className="h-1 w-10 rounded-full bg-emerald-400/70" />
+              Mission Control
+            </div>
+            <h1 className="mt-3 text-3xl font-semibold text-slate-100">
+              FinOps Migration Command Center
+            </h1>
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-400">
+              <span>User: {userName}</span>
+              <span>Role: {userRole}</span>
+              {usingMock && (
+                <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-amber-200">
+                  Mock Data
+                </span>
+              )}
+            </div>
           </div>
-          <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-300">
-            Agent ID: {data.telemetry.agentId}
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-slate-400">
-            Welcome, {userName} · Role: {userRole}
-          </span>
           <button
             type="button"
             onClick={() => signOut({ callbackUrl: '/login' })}
-            className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-emerald-500 hover:text-emerald-200"
+            className="rounded-lg border border-slate-700 px-4 py-2 text-xs uppercase tracking-[0.2em] text-slate-200 transition hover:border-emerald-500 hover:text-emerald-200"
           >
             Sign Out
           </button>
-        </div>
-      </header>
+        </header>
 
-      <section className="max-w-5xl mx-auto mt-8 grid gap-6 md:grid-cols-3">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
-          <div className="text-sm uppercase tracking-wide text-slate-400">CPU Usage</div>
-          <div className={`mt-4 text-4xl font-bold ${cpuColor}`}>
-            {cpuUsage.toFixed(1)}%
+        <section className="mt-8 grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-1">
+            <ControlPanel agents={agents} onSimulateChaos={handleSimulateChaos} />
           </div>
-          <div className="mt-2 text-xs text-slate-500">Threshold 80%</div>
-        </div>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
-          <div className="text-sm uppercase tracking-wide text-slate-400">Memory Usage</div>
-          <div className="mt-4 text-4xl font-bold text-blue-300">
-            {memoryUsage.toFixed(1)}%
+          <div className="lg:col-span-2 flex flex-col gap-6">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-[0_0_40px_rgba(15,23,42,0.6)]">
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Risk Trend</div>
+              <div className="mt-4">
+                <HistoryChart data={history} />
+              </div>
+            </div>
+
+            <AuditLogStream logs={auditLogs} />
           </div>
-          <div className="mt-2 text-xs text-slate-500">Available in real time</div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
-          <div className="text-sm uppercase tracking-wide text-slate-400">AI Health Status</div>
-          <div className={`mt-4 flex items-center gap-2 text-3xl font-bold ${aiColor}`}>
-            {isCritical ? <WarningIcon className="h-7 w-7" /> : <ShieldIcon className="h-7 w-7" />}
-            {aiLabel}
-          </div>
-          <div className="mt-2 text-xs text-slate-500">{confidenceLabel}</div>
-        </div>
-
-        <div className="md:col-span-3 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
-          <div className="text-sm uppercase tracking-wide text-slate-400">
-            AI Root Cause Analysis
-          </div>
-          <div className={`mt-4 text-lg font-semibold ${rootCauseColor}`}>{rootCauseText}</div>
-          <div className="mt-2 text-xs text-slate-500">{predictedLabel}</div>
-        </div>
-
-        <div className="md:col-span-3 rounded-2xl border border-slate-800 bg-slate-900 p-6">
-          <div className="text-sm uppercase tracking-wide text-slate-400">Last Updated</div>
-          <div className="mt-3 text-2xl font-semibold">{lastUpdated}</div>
-        </div>
-
-        <div className="md:col-span-3">
-          <ControlPanel agentId={data.telemetry.agentId} userRole={userRole} />
-        </div>
-      </section>
-
-      <section className="max-w-5xl mx-auto mt-8">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
-          <div className="text-sm uppercase tracking-wide text-slate-400">Real-time Trends</div>
-          <div className="mt-4">
-            <HistoryChart data={history} />
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </main>
   );
 }
