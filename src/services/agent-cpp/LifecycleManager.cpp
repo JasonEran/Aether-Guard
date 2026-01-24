@@ -33,8 +33,8 @@ bool DetectCriuAvailability() {
     return result == 0;
 }
 
-bool WriteDummySnapshot(const std::filesystem::path& archivePath) {
-    std::ofstream output(archivePath, std::ios::binary | std::ios::trunc);
+bool WriteSimulationMarker(const std::filesystem::path& markerPath) {
+    std::ofstream output(markerPath, std::ios::binary | std::ios::trunc);
     if (!output) {
         return false;
     }
@@ -102,8 +102,14 @@ std::string LifecycleManager::Checkpoint(const std::string& workloadId) {
         std::cout << "[SIMULATION] Simulating process freeze for 100ms..." << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-        if (!WriteDummySnapshot(archivePath)) {
-            std::cerr << "[Agent] Snapshot file creation failed for workload " << workloadId << std::endl;
+        const auto markerPath = imagesDir / "simulated.txt";
+        if (!WriteSimulationMarker(markerPath)) {
+            std::cerr << "[Agent] Snapshot marker creation failed for workload " << workloadId << std::endl;
+            return {};
+        }
+
+        if (!archive_.Compress(imagesDir.string(), archivePath.string())) {
+            std::cerr << "[Agent] Snapshot compression failed for workload " << workloadId << std::endl;
             return {};
         }
     }
@@ -158,6 +164,11 @@ bool LifecycleManager::Restore(const std::string& snapshotPath) {
     if (!archive_.Decompress(archivePath.string(), outputDir.string())) {
         std::cerr << "[Agent] Snapshot decompression failed for workload " << workloadId << std::endl;
         return false;
+    }
+
+    if (!criu_available_) {
+        std::cout << "[SIMULATION] Skipping CRIU restore. Assuming success." << std::endl;
+        return true;
     }
 
     return criu_.Restore(outputDir.string());

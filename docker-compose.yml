@@ -4,6 +4,8 @@ services:
       context: ./src/services/core-dotnet/AetherGuard.Core
     ports:
       - "5000:8080"
+    volumes:
+      - ./src/services/core-dotnet/AetherGuard.Core/Data:/app/Data
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DefaultConnection: "Host=db;Database=AetherGuardDb;Username=postgres;Password=password"
@@ -13,6 +15,7 @@ services:
       RabbitMq__Password: "secure_password"
       RabbitMq__Port: "5672"
       Security__CommandApiKey: "${COMMAND_API_KEY}"
+      ArtifactBaseUrl: "http://core-service:8080"
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -48,6 +51,8 @@ services:
       - "8000:8000"
     environment:
       PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./src/services/ai-engine/Data:/app/Data
     restart: always
     networks:
       - aether-net

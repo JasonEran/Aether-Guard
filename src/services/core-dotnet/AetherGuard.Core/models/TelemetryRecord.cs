@@ -22,6 +22,12 @@ public class TelemetryRecord
     [Column("DiskAvailable")]
     public long DiskAvailable { get; set; }
 
+    [Column("CpuUsage")]
+    public double CpuUsage { get; set; }
+
+    [Column("MemoryUsage")]
+    public double MemoryUsage { get; set; }
+
     [Column("AiStatus")]
     public string AiStatus { get; set; } = string.Empty;
 

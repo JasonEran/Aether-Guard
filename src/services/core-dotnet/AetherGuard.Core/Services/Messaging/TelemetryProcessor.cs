@@ -102,6 +102,8 @@ public sealed class TelemetryProcessor : BackgroundService
                     WorkloadTier = payload.WorkloadTier,
                     RebalanceSignal = payload.RebalanceSignal,
                     DiskAvailable = payload.DiskAvailable,
+                    CpuUsage = 0,
+                    MemoryUsage = 0,
                     AiStatus = status,
                     AiConfidence = confidence,
                     RootCause = analysis.RootCause,
