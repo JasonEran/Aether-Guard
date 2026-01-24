@@ -3,14 +3,22 @@
 #include <cpr/cpr.h>
 #include <nlohmann/json.hpp>
 
+#include <chrono>
 #include <filesystem>
 #include <system_error>
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <thread>
 #include <utility>
 
 namespace {
+constexpr int kMaxRetries = 3;
+constexpr auto kConnectTimeout = std::chrono::seconds(3);
+constexpr auto kTelemetryTimeout = std::chrono::seconds(5);
+constexpr int kLowSpeedBytesPerSecond = 1000;
+constexpr int kLowSpeedTimeoutSeconds = 5;
+
 std::string BuildUrl(const std::string& baseUrl, const std::string& path) {
     if (baseUrl.empty()) {
         return path;
@@ -21,6 +29,20 @@ std::string BuildUrl(const std::string& baseUrl, const std::string& path) {
     }
 
     return baseUrl + path;
+}
+
+bool IsSuccessStatus(const cpr::Response& response) {
+    return response.status_code == 200 || response.status_code == 201;
+}
+
+int BackoffSeconds(int attempt) {
+    return 1 << attempt;
+}
+
+void LogRetry(int attempt) {
+    const int waitSeconds = BackoffSeconds(attempt);
+    std::cerr << "[Network] Request failed (Attempt " << (attempt + 1) << "/" << kMaxRetries
+              << "). Retrying in " << waitSeconds << "s..." << std::endl;
 }
 } // namespace
 
@@ -81,34 +103,46 @@ bool NetworkClient::SendHeartbeat(
         headers["Authorization"] = "Bearer " + token;
     }
 
-    cpr::Response response = cpr::Post(
-        cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/heartbeat")},
-        cpr::Body{payload.dump()},
-        headers);
+    for (int attempt = 0; attempt < kMaxRetries; ++attempt) {
+        cpr::Response response = cpr::Post(
+            cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/heartbeat")},
+            cpr::Body{payload.dump()},
+            headers,
+            cpr::ConnectTimeout{kConnectTimeout},
+            cpr::Timeout{kTelemetryTimeout});
 
-    if (response.error.code != cpr::ErrorCode::OK) {
-        std::cerr << "[Agent] heartbeat failed: " << response.error.message << std::endl;
-        return false;
-    }
-
-    if (response.status_code >= 400) {
-        std::cerr << "[Agent] heartbeat failed with HTTP " << response.status_code << std::endl;
-        return false;
-    }
-
-    auto json = nlohmann::json::parse(response.text, nullptr, false);
-    if (!json.is_discarded() && json.contains("commands") && json["commands"].is_array()) {
-        for (const auto& item : json["commands"]) {
-            AgentCommand command;
-            command.id = item.value("id", 0);
-            command.type = item.value("type", "");
-            if (command.id > 0 && !command.type.empty()) {
-                outCommands.push_back(std::move(command));
+        const bool requestOk = response.error.code == cpr::ErrorCode::OK;
+        const bool statusOk = IsSuccessStatus(response);
+        if (requestOk && statusOk) {
+            auto json = nlohmann::json::parse(response.text, nullptr, false);
+            if (!json.is_discarded() && json.contains("commands") && json["commands"].is_array()) {
+                for (const auto& item : json["commands"]) {
+                    AgentCommand command;
+                    command.id = item.value("id", 0);
+                    command.type = item.value("type", "");
+                    if (command.id > 0 && !command.type.empty()) {
+                        outCommands.push_back(std::move(command));
+                    }
+                }
             }
+            return true;
         }
+
+        if (attempt + 1 < kMaxRetries) {
+            LogRetry(attempt);
+            std::this_thread::sleep_for(std::chrono::seconds(BackoffSeconds(attempt)));
+            continue;
+        }
+
+        if (!requestOk) {
+            std::cerr << "[Agent] heartbeat failed: " << response.error.message << std::endl;
+        } else {
+            std::cerr << "[Agent] heartbeat failed with HTTP " << response.status_code << std::endl;
+        }
+        return false;
     }
 
-    return true;
+    return false;
 }
 
 bool NetworkClient::PollCommands(const std::string& agentId, std::vector<CommandPayload>& outCommands) {
@@ -199,21 +233,34 @@ bool NetworkClient::UploadSnapshot(const std::string& url, const std::string& fi
         return false;
     }
 
-    cpr::Response response = cpr::Post(
-        cpr::Url{url},
-        cpr::Multipart{{"file", cpr::File{filePath}}});
+    for (int attempt = 0; attempt < kMaxRetries; ++attempt) {
+        cpr::Response response = cpr::Post(
+            cpr::Url{url},
+            cpr::Multipart{{"file", cpr::File{filePath}}},
+            cpr::ConnectTimeout{kConnectTimeout},
+            cpr::LowSpeed{kLowSpeedBytesPerSecond, kLowSpeedTimeoutSeconds});
 
-    if (response.error.code != cpr::ErrorCode::OK) {
-        std::cerr << "[Agent] upload failed: " << response.error.message << std::endl;
+        const bool requestOk = response.error.code == cpr::ErrorCode::OK;
+        const bool statusOk = IsSuccessStatus(response);
+        if (requestOk && statusOk) {
+            return true;
+        }
+
+        if (attempt + 1 < kMaxRetries) {
+            LogRetry(attempt);
+            std::this_thread::sleep_for(std::chrono::seconds(BackoffSeconds(attempt)));
+            continue;
+        }
+
+        if (!requestOk) {
+            std::cerr << "[Agent] upload failed: " << response.error.message << std::endl;
+        } else {
+            std::cerr << "[Agent] upload failed with HTTP " << response.status_code << std::endl;
+        }
         return false;
     }
 
-    if (response.status_code >= 400) {
-        std::cerr << "[Agent] upload failed with HTTP " << response.status_code << std::endl;
-        return false;
-    }
-
-    return true;
+    return false;
 }
 
 bool NetworkClient::DownloadSnapshot(const std::string& url, const std::string& outputPath) {
