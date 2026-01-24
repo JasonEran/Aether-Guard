@@ -77,9 +77,10 @@ public class MigrationOrchestrator
         var rebalanceSignal = latestTelemetry?.RebalanceSignal ?? false;
         var diskAvailable = latestTelemetry?.DiskAvailable ?? 0;
 
-        if (TryReadMarketSignal(out var overrideSignal))
+        var (hasSignal, signalValue) = await TryReadMarketSignalAsync(cancellationToken);
+        if (hasSignal)
         {
-            rebalanceSignal = overrideSignal;
+            rebalanceSignal = signalValue;
         }
 
         var riskPayload = new TelemetryPayload(
@@ -268,36 +269,58 @@ public class MigrationOrchestrator
         return CommandOutcome.Timeout;
     }
 
-    private bool TryReadMarketSignal(out bool rebalanceSignal)
+    private async Task<(bool Success, bool Signal)> TryReadMarketSignalAsync(CancellationToken cancellationToken)
     {
-        rebalanceSignal = false;
         var marketSignalPath = _configuration["MarketSignalPath"] ?? "Data/market_signal.json";
+        var contentRoot = _environment.ContentRootPath;
         var resolvedPath = Path.IsPathRooted(marketSignalPath)
             ? marketSignalPath
-            : Path.Combine(_environment.ContentRootPath, marketSignalPath);
+            : Path.Combine(contentRoot, marketSignalPath);
+        var resolvedFullPath = Path.GetFullPath(resolvedPath);
+        var contentRootFullPath = Path.GetFullPath(contentRoot);
+        var rootWithSeparator = contentRootFullPath.EndsWith(Path.DirectorySeparatorChar)
+            ? contentRootFullPath
+            : contentRootFullPath + Path.DirectorySeparatorChar;
 
-        if (!File.Exists(resolvedPath))
+        if (!resolvedFullPath.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(resolvedFullPath, contentRootFullPath, StringComparison.OrdinalIgnoreCase))
         {
-            return false;
+            _logger.LogWarning("Market signal path {MarketSignalPath} is outside the content root.", resolvedFullPath);
+            return (false, false);
+        }
+
+        if (!File.Exists(resolvedFullPath))
+        {
+            return (false, false);
         }
 
         try
         {
-            using var stream = File.OpenRead(resolvedPath);
-            var document = JsonDocument.Parse(stream);
+            await using var stream = new FileStream(
+                resolvedFullPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite,
+                4096,
+                useAsync: true);
+            var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
             if (document.RootElement.TryGetProperty("rebalanceSignal", out var element)
                 && (element.ValueKind == JsonValueKind.True || element.ValueKind == JsonValueKind.False))
             {
-                rebalanceSignal = element.GetBoolean();
-                return true;
+                return (true, element.GetBoolean());
             }
+        }
+        catch (IOException ex)
+        {
+            _logger.LogWarning(ex, "Failed to read market signal file.");
+            return (false, false);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to read market signal file.");
         }
 
-        return false;
+        return (false, false);
     }
 
     private string? FindLatestSnapshotPath(string workloadId)
