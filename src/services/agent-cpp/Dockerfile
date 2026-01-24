@@ -24,6 +24,9 @@ FROM ubuntu:22.04 AS runtime
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        criu \
+        iproute2 \
         libstdc++6 \
         libgcc-s1 \
         libcurl4 \
