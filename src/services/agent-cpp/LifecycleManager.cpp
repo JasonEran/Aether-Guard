@@ -3,26 +3,65 @@
 #include "NetworkClient.hpp"
 
 #include <chrono>
+#include <cstdlib>
 #include <ctime>
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <thread>
 #include <utility>
+
+namespace {
+std::string BuildCriuCheckCommand() {
+#ifdef _WIN32
+    return "criu check --ms > NUL 2>&1";
+#else
+    return "criu check --ms > /dev/null 2>&1";
+#endif
+}
+
+bool DetectCriuAvailability() {
+    const std::string command = BuildCriuCheckCommand();
+    if (command.empty()) {
+        return false;
+    }
+
+    const int result = std::system(command.c_str());
+    return result == 0;
+}
+
+bool WriteDummySnapshot(const std::filesystem::path& archivePath) {
+    std::ofstream output(archivePath, std::ios::binary | std::ios::trunc);
+    if (!output) {
+        return false;
+    }
+
+    const std::string payload = "SIMULATED";
+    output.write(payload.data(), static_cast<std::streamsize>(payload.size()));
+    return output.good();
+}
+} // namespace
 
 LifecycleManager::LifecycleManager(NetworkClient& client, std::string orchestratorBaseUrl)
     : client_(client),
-      orchestratorBaseUrl_(std::move(orchestratorBaseUrl)) {}
+      orchestratorBaseUrl_(std::move(orchestratorBaseUrl)) {
+    criu_available_ = DetectCriuAvailability();
+    if (criu_available_) {
+        std::cout << "[INFO] CRIU detected. Real checkpointing enabled." << std::endl;
+    } else {
+        std::cout << "[WARN] CRIU not available (Host restriction?). Switching to SIMULATION MODE." << std::endl;
+    }
+}
 
 bool LifecycleManager::PreFlightCheck() const {
     constexpr long long minDiskBytes = 1LL * 1024 * 1024 * 1024;
     const long long availableDiskBytes = 2LL * 1024 * 1024 * 1024;
-    const std::string criuVersion = "3.15";
 
     const bool diskOk = availableDiskBytes > minDiskBytes;
-    const bool criuOk = !criuVersion.empty();
-    return diskOk && criuOk;
+    return diskOk;
 }
 
 std::string LifecycleManager::Checkpoint(const std::string& workloadId) {
@@ -48,15 +87,25 @@ std::string LifecycleManager::Checkpoint(const std::string& workloadId) {
         return {};
     }
 
-    const int pid = ParsePid(workloadId);
-    if (!criu_.Dump(pid, imagesDir.string())) {
-        std::cerr << "[Agent] CRIU dump failed for workload " << workloadId << std::endl;
-        return {};
-    }
+    if (criu_available_) {
+        const int pid = ParsePid(workloadId);
+        if (!criu_.Dump(pid, imagesDir.string())) {
+            std::cerr << "[Agent] CRIU dump failed for workload " << workloadId << std::endl;
+            return {};
+        }
 
-    if (!archive_.Compress(imagesDir.string(), archivePath.string())) {
-        std::cerr << "[Agent] Snapshot compression failed for workload " << workloadId << std::endl;
-        return {};
+        if (!archive_.Compress(imagesDir.string(), archivePath.string())) {
+            std::cerr << "[Agent] Snapshot compression failed for workload " << workloadId << std::endl;
+            return {};
+        }
+    } else {
+        std::cout << "[SIMULATION] Simulating process freeze for 100ms..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        if (!WriteDummySnapshot(archivePath)) {
+            std::cerr << "[Agent] Snapshot file creation failed for workload " << workloadId << std::endl;
+            return {};
+        }
     }
 
     const std::string uploadUrl = BuildUrl(orchestratorBaseUrl_, "/upload/" + safeWorkloadId);

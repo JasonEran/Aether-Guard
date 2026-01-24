@@ -37,4 +37,5 @@ private:
     CriuManager criu_;
     ArchiveManager archive_;
     std::string orchestratorBaseUrl_;
+    bool criu_available_ = false;
 };
