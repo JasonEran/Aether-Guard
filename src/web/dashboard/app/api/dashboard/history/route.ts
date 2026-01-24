@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const coreBaseUrl = process.env.CORE_API_URL ?? 'http://core-service:8080';
 
 export async function GET() {
