@@ -2,6 +2,7 @@ using System.Text.Json;
 using AetherGuard.Core.Data;
 using AetherGuard.Core.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AetherGuard.Core.Services;
 
@@ -11,7 +12,7 @@ public class MigrationOrchestrator
     private static readonly TimeSpan DefaultCommandTimeout = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
 
-    private readonly ApplicationDbContext _context;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly CommandService _commandService;
     private readonly AnalysisService _analysisService;
     private readonly IConfiguration _configuration;
@@ -19,14 +20,14 @@ public class MigrationOrchestrator
     private readonly ILogger<MigrationOrchestrator> _logger;
 
     public MigrationOrchestrator(
-        ApplicationDbContext context,
+        IServiceScopeFactory serviceScopeFactory,
         CommandService commandService,
         AnalysisService analysisService,
         IConfiguration configuration,
         IWebHostEnvironment environment,
         ILogger<MigrationOrchestrator> logger)
     {
-        _context = context;
+        _serviceScopeFactory = serviceScopeFactory;
         _commandService = commandService;
         _analysisService = analysisService;
         _configuration = configuration;
@@ -42,7 +43,10 @@ public class MigrationOrchestrator
             return;
         }
 
-        var sourceAgent = await _context.Agents
+        using var scope = _serviceScopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var sourceAgent = await context.Agents
             .AsNoTracking()
             .FirstOrDefaultAsync(agent => agent.Id == sourceId, cancellationToken);
 
@@ -52,19 +56,19 @@ public class MigrationOrchestrator
             return;
         }
 
-        if (await HasPendingCommandsAsync(sourceId, cancellationToken))
+        if (await HasPendingCommandsAsync(context, sourceId, cancellationToken))
         {
             _logger.LogInformation("Source agent {SourceAgentId} has pending commands. Skipping cycle.", sourceAgentId);
             return;
         }
 
-        if (await HasRecentMigrationAsync(sourceAgentId, cancellationToken))
+        if (await HasRecentMigrationAsync(context, sourceAgentId, cancellationToken))
         {
             _logger.LogInformation("Recent migration found for {SourceAgentId}. Skipping cycle.", sourceAgentId);
             return;
         }
 
-        var latestTelemetry = await _context.TelemetryRecords
+        var latestTelemetry = await context.TelemetryRecords
             .AsNoTracking()
             .Where(record => record.AgentId == sourceAgentId)
             .OrderByDescending(record => record.Timestamp)
@@ -95,7 +99,7 @@ public class MigrationOrchestrator
             return;
         }
 
-        var targetAgent = await FindIdleTargetAsync(sourceId, cancellationToken);
+        var targetAgent = await FindIdleTargetAsync(context, sourceId, cancellationToken);
         if (targetAgent is null)
         {
             _logger.LogWarning("No idle target agent available for migration from {SourceAgentId}", sourceAgentId);
@@ -109,6 +113,7 @@ public class MigrationOrchestrator
             cancellationToken);
 
         var checkpointResult = await WaitForCommandCompletionAsync(
+            context,
             checkpointCommand.CommandId,
             DefaultCommandTimeout,
             cancellationToken);
@@ -134,6 +139,7 @@ public class MigrationOrchestrator
             cancellationToken);
 
         var restoreResult = await WaitForCommandCompletionAsync(
+            context,
             restoreCommand.CommandId,
             DefaultCommandTimeout,
             cancellationToken);
@@ -144,7 +150,7 @@ public class MigrationOrchestrator
             return;
         }
 
-        _context.CommandAudits.Add(new CommandAudit
+        context.CommandAudits.Add(new CommandAudit
         {
             CommandId = restoreCommand.CommandId,
             Actor = sourceAgentId,
@@ -154,7 +160,7 @@ public class MigrationOrchestrator
             CreatedAt = DateTime.UtcNow
         });
 
-        await _context.SaveChangesAsync(cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     private bool IsAgentActive(Agent agent)
@@ -178,17 +184,23 @@ public class MigrationOrchestrator
         return DefaultHeartbeatTimeout;
     }
 
-    private async Task<bool> HasPendingCommandsAsync(Guid agentId, CancellationToken cancellationToken)
+    private async Task<bool> HasPendingCommandsAsync(
+        ApplicationDbContext context,
+        Guid agentId,
+        CancellationToken cancellationToken)
     {
-        return await _context.AgentCommands
+        return await context.AgentCommands
             .AsNoTracking()
             .AnyAsync(command => command.AgentId == agentId && command.Status == "PENDING", cancellationToken);
     }
 
-    private async Task<bool> HasRecentMigrationAsync(string sourceAgentId, CancellationToken cancellationToken)
+    private async Task<bool> HasRecentMigrationAsync(
+        ApplicationDbContext context,
+        string sourceAgentId,
+        CancellationToken cancellationToken)
     {
         var cutoff = DateTime.UtcNow.AddMinutes(-2);
-        return await _context.CommandAudits
+        return await context.CommandAudits
             .AsNoTracking()
             .AnyAsync(
                 audit => audit.Action == "Migration Completed"
@@ -197,9 +209,12 @@ public class MigrationOrchestrator
                 cancellationToken);
     }
 
-    private async Task<Agent?> FindIdleTargetAsync(Guid sourceAgentId, CancellationToken cancellationToken)
+    private async Task<Agent?> FindIdleTargetAsync(
+        ApplicationDbContext context,
+        Guid sourceAgentId,
+        CancellationToken cancellationToken)
     {
-        var candidates = await _context.Agents
+        var candidates = await context.Agents
             .AsNoTracking()
             .Where(agent => agent.Id != sourceAgentId)
             .ToListAsync(cancellationToken);
@@ -211,7 +226,7 @@ public class MigrationOrchestrator
                 continue;
             }
 
-            if (await HasPendingCommandsAsync(candidate.Id, cancellationToken))
+            if (await HasPendingCommandsAsync(context, candidate.Id, cancellationToken))
             {
                 continue;
             }
@@ -223,6 +238,7 @@ public class MigrationOrchestrator
     }
 
     private async Task<CommandOutcome> WaitForCommandCompletionAsync(
+        ApplicationDbContext context,
         Guid commandId,
         TimeSpan timeout,
         CancellationToken cancellationToken)
@@ -230,7 +246,7 @@ public class MigrationOrchestrator
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow <= deadline)
         {
-            var status = await _context.AgentCommands
+            var status = await context.AgentCommands
                 .AsNoTracking()
                 .Where(command => command.CommandId == commandId)
                 .Select(command => command.Status)
