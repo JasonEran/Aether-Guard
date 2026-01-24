@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { signOut } from 'next-auth/react';
 
 import AuditLogStream from '../components/AuditLogStream';
@@ -16,67 +16,82 @@ interface DashboardClientProps {
 
 type FleetEntry = Agent & { lastCheckpoint?: string };
 
-const MOCK_PAYLOAD = (() => {
-  const baseTime = Date.parse('2025-01-01T00:00:00.000Z');
-  const timestamps = Array.from({ length: 12 }, (_, index) => new Date(baseTime - (11 - index) * 60_000));
-  const mockHistory: RiskPoint[] = timestamps.map((timestamp, index) => ({
-    timestamp: timestamp.toISOString(),
-    riskScore: index < 5 ? 0.35 : index < 9 ? 0.62 : 0.86,
-  }));
+const buildMockPayload = (now: number, chaosActive: boolean) => {
+  const timestamps = Array.from({ length: 12 }, (_, index) => new Date(now - (11 - index) * 60_000));
+  const baseRisk = chaosActive ? 0.68 : 0.32;
+  const slope = chaosActive ? 0.018 : 0.012;
+  const mockHistory: RiskPoint[] = timestamps.map((timestamp, index) => {
+    const noise = Math.sin((now / 1000 + index) * 0.7) * (chaosActive ? 0.06 : 0.03);
+    const riskScore = Math.min(1, Math.max(0, baseRisk + index * slope + noise));
+    return {
+      timestamp: timestamp.toISOString(),
+      riskScore,
+    };
+  });
 
   const mockAgents: FleetEntry[] = [
     {
       agentId: 'node-atlas-01',
       status: 'IDLE',
       tier: 'T1',
-      riskScore: 0.18,
-      lastHeartbeat: new Date(baseTime - 45_000).toISOString(),
-      lastCheckpoint: new Date(baseTime - 12 * 60_000).toISOString(),
+      riskScore: chaosActive ? 0.33 : 0.18,
+      lastHeartbeat: new Date(now - 45_000).toISOString(),
+      lastCheckpoint: new Date(now - 12 * 60_000).toISOString(),
     },
     {
       agentId: 'node-zephyr-07',
-      status: 'MIGRATING',
+      status: chaosActive ? 'MIGRATING' : 'IDLE',
       tier: 'T2',
-      riskScore: 0.87,
-      lastHeartbeat: new Date(baseTime - 30_000).toISOString(),
-      lastCheckpoint: new Date(baseTime - 2 * 60_000).toISOString(),
+      riskScore: chaosActive ? 0.87 : 0.46,
+      lastHeartbeat: new Date(now - 30_000).toISOString(),
+      lastCheckpoint: new Date(now - 2 * 60_000).toISOString(),
     },
     {
       agentId: 'node-sigma-12',
       status: 'FAILED',
       tier: 'T3',
       riskScore: 0.95,
-      lastHeartbeat: new Date(baseTime - 8 * 60_000).toISOString(),
-      lastCheckpoint: new Date(baseTime - 30 * 60_000).toISOString(),
+      lastHeartbeat: new Date(now - 8 * 60_000).toISOString(),
+      lastCheckpoint: new Date(now - 30 * 60_000).toISOString(),
     },
   ];
 
   const mockAudits: AuditLog[] = [
     {
-      id: 'audit-01',
+      id: `audit-${now}-01`,
       action: 'Migration Completed',
       agentId: 'node-zephyr-07',
       result: 'Restored on node-atlas-01',
-      timestamp: new Date(baseTime - 90_000).toISOString(),
+      timestamp: new Date(now - 90_000).toISOString(),
     },
     {
-      id: 'audit-02',
+      id: `audit-${now}-02`,
       action: 'Checkpoint Created',
       agentId: 'node-zephyr-07',
       result: 'Snapshot stored in relay vault',
-      timestamp: new Date(baseTime - 2 * 60_000).toISOString(),
+      timestamp: new Date(now - 2 * 60_000).toISOString(),
     },
     {
-      id: 'audit-03',
+      id: `audit-${now}-03`,
       action: 'Risk Scan Updated',
       agentId: 'node-sigma-12',
       result: 'Priority raised to CRITICAL',
-      timestamp: new Date(baseTime - 4 * 60_000).toISOString(),
+      timestamp: new Date(now - 4 * 60_000).toISOString(),
     },
   ];
 
+  if (chaosActive) {
+    mockAudits.unshift({
+      id: `audit-${now}-chaos`,
+      action: 'Rebalance Signal Injected',
+      agentId: 'control-plane',
+      result: 'Chaos simulation engaged',
+      timestamp: new Date(now - 25_000).toISOString(),
+    });
+  }
+
   return { mockHistory, mockAgents, mockAudits };
-})();
+};
 
 const formatLocalTime = (value?: string) => {
   if (!value) {
@@ -97,6 +112,7 @@ export default function DashboardClient({ userName, userRole }: DashboardClientP
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [usingMock, setUsingMock] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>('');
+  const mockChaosAtRef = useRef<number | null>(null);
 
   const summary = useMemo(() => {
     const total = agents.length;
@@ -126,31 +142,38 @@ export default function DashboardClient({ userName, userRole }: DashboardClientP
     let isMounted = true;
 
     const load = async () => {
-      const [fleetData, historyData, auditData] = await Promise.all([
+      const [fleetResult, historyResult, auditResult] = await Promise.allSettled([
         fetchFleetStatus(),
         fetchRiskHistory(),
         fetchAuditLogs(),
       ]);
 
+      const fleetData = fleetResult.status === 'fulfilled' ? fleetResult.value : [];
+      const historyData = historyResult.status === 'fulfilled' ? historyResult.value : [];
+      const auditData = auditResult.status === 'fulfilled' ? auditResult.value : [];
+
       if (!isMounted) {
         return;
       }
 
+      const now = Date.now();
+      const chaosActive = mockChaosAtRef.current !== null && now - mockChaosAtRef.current < 10 * 60_000;
+      const mockPayload = buildMockPayload(now, chaosActive);
       const useMockFleet = fleetData.length === 0;
       const useMockHistory = historyData.length === 0;
       const useMockAudits = auditData.length === 0;
       const useMock = useMockFleet || useMockHistory || useMockAudits;
       setUsingMock(useMock);
       const fleetSource: FleetEntry[] = useMockFleet
-        ? MOCK_PAYLOAD.mockAgents
+        ? mockPayload.mockAgents
         : fleetData.map((agent) => ({
             ...agent,
             lastCheckpoint: agent.lastHeartbeat,
           }));
       setAgents(fleetSource);
-      setHistory(useMockHistory ? MOCK_PAYLOAD.mockHistory : historyData);
-      setAuditLogs((useMockAudits ? MOCK_PAYLOAD.mockAudits : auditData).slice(0, 12));
-      setLastUpdated(new Date().toISOString());
+      setHistory(useMockHistory ? mockPayload.mockHistory : historyData);
+      setAuditLogs((useMockAudits ? mockPayload.mockAudits : auditData).slice(0, 12));
+      setLastUpdated(new Date(now).toISOString());
     };
 
     load();
@@ -164,7 +187,18 @@ export default function DashboardClient({ userName, userRole }: DashboardClientP
 
   const handleSimulateChaos = async () => {
     await sendChaosSignal();
-    const timestamp = new Date().toISOString();
+    const now = Date.now();
+    const timestamp = new Date(now).toISOString();
+    mockChaosAtRef.current = now;
+
+    if (usingMock) {
+      const mockPayload = buildMockPayload(now, true);
+      setAgents(mockPayload.mockAgents);
+      setHistory(mockPayload.mockHistory);
+      setAuditLogs(mockPayload.mockAudits.slice(0, 12));
+      setLastUpdated(timestamp);
+      return;
+    }
 
     setAgents((prev) =>
       prev.map((agent) =>

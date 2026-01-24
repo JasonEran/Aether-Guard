@@ -109,10 +109,22 @@ export async function fetchRiskHistory(): Promise<RiskPoint[]> {
     }
 
     const data = (await response.json()) as CoreHistoryRecord[];
-    return data.map((record) => ({
-      timestamp: toIsoTimestamp(record.timestamp),
-      riskScore: normalizeRiskScore(record.aiConfidence ?? 0),
-    }));
+    let lastScore = 0;
+    return data.map((record) => {
+      const hasConfidence =
+        typeof record.aiConfidence === 'number' && Number.isFinite(record.aiConfidence);
+      const fallbackScore = record.rebalanceSignal ? 0.92 : lastScore;
+      const rawScore = hasConfidence ? record.aiConfidence : fallbackScore;
+      const normalized = normalizeRiskScore(rawScore);
+      const finalScore = !hasConfidence && normalized === 0 ? lastScore : normalized;
+
+      lastScore = finalScore;
+
+      return {
+        timestamp: toIsoTimestamp(record.timestamp),
+        riskScore: finalScore,
+      };
+    });
   } catch (error) {
     console.error('[Dashboard] Failed to fetch risk history', error);
     return [];

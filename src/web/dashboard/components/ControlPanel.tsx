@@ -80,20 +80,20 @@ export default function ControlPanel({ agents, onSimulateChaos }: ControlPanelPr
           type="button"
           onClick={handleChaos}
           disabled={chaosStatus === 'loading'}
-          className="rounded-lg border border-amber-500/60 bg-amber-500/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-amber-200 transition hover:border-amber-400 hover:bg-amber-500/30 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-800"
+          className="whitespace-nowrap rounded-lg border border-amber-500/60 bg-amber-500/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-amber-200 transition hover:border-amber-400 hover:bg-amber-500/30 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-800"
         >
           {chaosStatus === 'loading' ? 'Signaling...' : 'Simulate Chaos'}
         </button>
       </div>
 
-      <div className="mt-5 overflow-hidden rounded-xl border border-slate-800">
-        <table className="w-full text-left text-sm text-slate-200">
+      <div className="mt-5 overflow-x-auto rounded-xl border border-slate-800">
+        <table className="min-w-[520px] w-full table-fixed text-left text-sm text-slate-200">
           <thead className="bg-slate-900/80 text-xs uppercase tracking-[0.2em] text-slate-400">
             <tr>
-              <th className="px-4 py-3">Agent ID</th>
-              <th className="px-4 py-3">Workload Tier</th>
-              <th className="px-4 py-3">Current State</th>
-              <th className="px-4 py-3">Last Checkpoint</th>
+              <th className="px-4 py-3 whitespace-nowrap">Agent ID</th>
+              <th className="px-4 py-3 whitespace-nowrap">Workload Tier</th>
+              <th className="px-4 py-3 whitespace-nowrap">Current State</th>
+              <th className="px-4 py-3 whitespace-nowrap">Last Checkpoint</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800">
@@ -105,7 +105,11 @@ export default function ControlPanel({ agents, onSimulateChaos }: ControlPanelPr
 
               return (
                 <tr key={agent.agentId} className="bg-slate-950/40 transition hover:bg-slate-900/60">
-                  <td className="px-4 py-3 font-mono text-xs text-slate-300">{agent.agentId}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-slate-300">
+                    <span className="block max-w-[140px] truncate" title={agent.agentId}>
+                      {agent.agentId}
+                    </span>
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`rounded-full border px-3 py-1 text-xs font-semibold ${tierClass}`}
@@ -118,7 +122,7 @@ export default function ControlPanel({ agents, onSimulateChaos }: ControlPanelPr
                       {statusKey}
                     </span>
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-400">
+                  <td className="px-4 py-3 font-mono text-xs text-slate-400 whitespace-nowrap">
                     {formatTimestamp(agent.lastCheckpoint ?? agent.lastHeartbeat)}
                   </td>
                 </tr>
