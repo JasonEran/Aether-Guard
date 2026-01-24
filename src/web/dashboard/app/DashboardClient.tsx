@@ -164,15 +164,21 @@ export default function DashboardClient({ userName, userRole }: DashboardClientP
       const useMockAudits = auditData.length === 0;
       const useMock = useMockFleet || useMockHistory || useMockAudits;
       setUsingMock(useMock);
-      const fleetSource: FleetEntry[] = useMockFleet
-        ? mockPayload.mockAgents
-        : fleetData.map((agent) => ({
-            ...agent,
-            lastCheckpoint: agent.lastHeartbeat,
-          }));
+      if (useMock) {
+        setAgents(mockPayload.mockAgents);
+        setHistory(mockPayload.mockHistory);
+        setAuditLogs(mockPayload.mockAudits.slice(0, 12));
+        setLastUpdated(new Date(now).toISOString());
+        return;
+      }
+
+      const fleetSource: FleetEntry[] = fleetData.map((agent) => ({
+        ...agent,
+        lastCheckpoint: agent.lastHeartbeat,
+      }));
       setAgents(fleetSource);
-      setHistory(useMockHistory ? mockPayload.mockHistory : historyData);
-      setAuditLogs((useMockAudits ? mockPayload.mockAudits : auditData).slice(0, 12));
+      setHistory(historyData);
+      setAuditLogs(auditData.slice(0, 12));
       setLastUpdated(new Date(now).toISOString());
     };
 
