@@ -67,7 +67,12 @@ export default function HistoryChart({ data }: HistoryChartProps) {
           <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" />
           <ReferenceArea y1={0} y2={0.8} fill="#064e3b" fillOpacity={0.25} />
           <ReferenceArea y1={0.8} y2={1} fill="#7f1d1d" fillOpacity={0.25} />
-          <ReferenceLine y={0.8} stroke="#ef4444" strokeDasharray="4 4" />
+          <ReferenceLine
+            y={0.8}
+            stroke="#ef4444"
+            strokeDasharray="4 4"
+            label={{ value: 'Critical 0.8', position: 'insideTopRight', fill: '#fca5a5', fontSize: 11 }}
+          />
           <XAxis
             dataKey="timestamp"
             tickFormatter={formatTime}

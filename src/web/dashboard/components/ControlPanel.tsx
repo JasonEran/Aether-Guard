@@ -13,8 +13,20 @@ interface ControlPanelProps {
 
 const statusStyles: Record<string, string> = {
   IDLE: 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300',
+  PREPARING: 'border-sky-500/40 bg-sky-500/15 text-sky-200',
+  CHECKPOINTING: 'border-amber-500/40 bg-amber-500/15 text-amber-200',
+  TRANSFERRING: 'border-amber-500/40 bg-amber-500/15 text-amber-200',
+  RESTORING: 'border-sky-500/40 bg-sky-500/15 text-sky-200',
   MIGRATING: 'border-amber-500/40 bg-amber-500/15 text-amber-300',
+  ONLINE: 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300',
+  OFFLINE: 'border-slate-600 bg-slate-800 text-slate-300',
   FAILED: 'border-red-500/40 bg-red-500/15 text-red-300',
+};
+
+const tierStyles: Record<Agent['tier'], string> = {
+  T1: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200',
+  T2: 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200',
+  T3: 'border-rose-500/40 bg-rose-500/10 text-rose-200',
 };
 
 const formatTimestamp = (value?: string) => {
@@ -85,28 +97,33 @@ export default function ControlPanel({ agents, onSimulateChaos }: ControlPanelPr
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800">
-            {agents.map((agent) => (
-              <tr key={agent.agentId} className="bg-slate-950/40">
-                <td className="px-4 py-3 font-mono text-xs text-slate-300">{agent.agentId}</td>
-                <td className="px-4 py-3">
-                  <span className="rounded-full border border-slate-700 px-3 py-1 text-xs font-semibold text-slate-200">
-                    {agent.tier}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                      statusStyles[agent.status] ?? 'border-slate-600 bg-slate-800 text-slate-300'
-                    }`}
-                  >
-                    {agent.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-xs text-slate-400">
-                  {formatTimestamp(agent.lastCheckpoint ?? agent.lastHeartbeat)}
-                </td>
-              </tr>
-            ))}
+            {agents.map((agent) => {
+              const statusKey = agent.status?.toUpperCase() ?? 'UNKNOWN';
+              const statusClass =
+                statusStyles[statusKey] ?? 'border-slate-600 bg-slate-800 text-slate-300';
+              const tierClass = tierStyles[agent.tier] ?? 'border-slate-700 text-slate-200';
+
+              return (
+                <tr key={agent.agentId} className="bg-slate-950/40 transition hover:bg-slate-900/60">
+                  <td className="px-4 py-3 font-mono text-xs text-slate-300">{agent.agentId}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${tierClass}`}
+                    >
+                      {agent.tier}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClass}`}>
+                      {statusKey}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-slate-400">
+                    {formatTimestamp(agent.lastCheckpoint ?? agent.lastHeartbeat)}
+                  </td>
+                </tr>
+              );
+            })}
             {agents.length === 0 && (
               <tr className="bg-slate-950/40">
                 <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={4}>

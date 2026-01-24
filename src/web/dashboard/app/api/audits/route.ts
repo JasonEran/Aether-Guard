@@ -5,7 +5,7 @@ const coreBaseUrl = process.env.CORE_API_URL ?? 'http://core-service:8080';
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const query = url.searchParams.toString();
-  const targetUrl = `${coreBaseUrl}/audits${query ? `?${query}` : ''}`;
+  const targetUrl = `${coreBaseUrl}/api/v1/audits${query ? `?${query}` : ''}`;
 
   const response = await fetch(targetUrl, { cache: 'no-store' });
   const text = await response.text();

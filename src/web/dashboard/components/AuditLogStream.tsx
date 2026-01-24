@@ -14,10 +14,20 @@ const formatTimestamp = (value: string) => {
   return new Date(parsed).toLocaleTimeString();
 };
 
-const highlightAction = (action: string) =>
-  action === 'Migration Completed'
-    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
-    : 'border-slate-700 bg-slate-900/60 text-slate-200';
+const highlightAction = (action: string, result: string) => {
+  const normalizedAction = action.toLowerCase();
+  const normalizedResult = result.toLowerCase();
+
+  if (normalizedAction === 'migration completed') {
+    return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
+  }
+
+  if (normalizedAction.includes('failed') || normalizedResult.includes('fail') || normalizedResult.includes('error')) {
+    return 'border-red-500/40 bg-red-500/10 text-red-200';
+  }
+
+  return 'border-slate-700 bg-slate-900/60 text-slate-200';
+};
 
 export default function AuditLogStream({ logs }: AuditLogStreamProps) {
   return (
@@ -27,11 +37,11 @@ export default function AuditLogStream({ logs }: AuditLogStreamProps) {
         {logs.map((log) => (
           <div
             key={log.id}
-            className={`rounded-xl border px-4 py-3 ${highlightAction(log.action)}`}
+            className={`rounded-xl border px-4 py-3 ${highlightAction(log.action, log.result)}`}
           >
             <div className="flex items-center justify-between text-xs uppercase tracking-[0.15em] text-slate-400">
               <span>{formatTimestamp(log.timestamp)}</span>
-              <span>Agent {log.agentId}</span>
+              <span className="font-mono text-[11px]">Agent {log.agentId}</span>
             </div>
             <div className="mt-2 text-sm font-semibold">{log.action}</div>
             <div className="mt-1 text-xs text-slate-300">{log.result}</div>
