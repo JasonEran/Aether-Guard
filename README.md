@@ -1,6 +1,6 @@
 ![Aether-Guard Logo](./aether-guard.png)
 
-# Aether-Guard
+# Aether-Guard v2.2 (Reference Architecture)
 
 [![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=c%2B%2B&logoColor=white)](https://isocpp.org/)
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
@@ -9,29 +9,83 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 
-Aether-Guard is a distributed infrastructure monitoring system designed as a
-public good project for free enterprise monitoring. It combines a high-
-performance C++ agent with a .NET Core API, a Python AI engine, and a Next.js
-dashboard to deliver real-time telemetry, lightweight anomaly analysis, and
-historical insights.
+Aether-Guard is a distributed infrastructure monitoring and migration system that
+combines a high-performance C++ agent, a .NET Core control plane, a Python AI
+engine, and a Next.js dashboard for real-time telemetry and risk-aware recovery.
+
+This README documents the current implementation in this repo (v1.x) and the
+v2.2 reference architecture with a concrete implementation guide.
 
 ## Project Status
 
-- Stage: MVP completed, preparing for public release
+- Stage: MVP implementation in repo; v2.2 is a reference architecture target
 - License: MIT
 - Authors: Qi Junyi, Xiao Erdong (2026)
 
-## Architecture
+## Current Implementation Snapshot (v1.x)
 
-Data flow:
+- Agent (C++): REST/JSON telemetry; CRIU checkpointing with automatic simulation fallback.
+- Core API (.NET 8): REST controllers, RabbitMQ ingestion worker, migration orchestration, PostgreSQL storage.
+- AI Engine (FastAPI): volatility and trend rules; Core currently sends empty spotPriceHistory (see Risk Logic).
+- Dashboard (Next.js): telemetry and command visibility with NextAuth credentials.
+- Storage: snapshots stored on local filesystem (Docker volume in compose).
+- Security: API key for command endpoints; no mTLS, OpenTelemetry, or schema registry yet.
 
-Agent (C++) -> Core API (.NET) -> AI Engine (FastAPI) -> Core API -> PostgreSQL -> Dashboard (Next.js)
+## v2.2 Reference Architecture
 
-Control plane vs data plane:
+### 1) Communication and Protocol (Dual-Stack + Trace Context)
 
-- Data plane: the C++ agent collects system metrics and posts telemetry.
-- Control plane: the Core API validates, enriches with AI analysis, persists
-  data, and exposes read APIs for the dashboard.
+- Core API enables gRPC + JSON transcoding so internal traffic uses Protobuf and external clients keep REST/JSON.
+- W3C trace context must propagate across HTTP and RabbitMQ by injecting traceparent and tracestate headers.
+
+### 2) Lifecycle and Compatibility (Handshake and Negotiation)
+
+- Agent performs capability probe (kernel, CRIU, eBPF, feature flags) and reports a Capabilities payload at registration.
+- Core responds with AgentConfig to enable or disable features based on compatibility and policy.
+
+### 3) Data Governance (Schema Registry + Object Storage)
+
+- RabbitMQ messages use explicit schemas (Avro/Protobuf) with schema_id + payload, plus upcaster logic for old events.
+- Snapshots move to object storage (MinIO/S3) with hot, warm, and cold retention policies.
+
+### 4) Security (SPIFFE + SLSA)
+
+- Workload identity uses SPIFFE/SPIRE with short-lived SVIDs; mTLS replaces static certs.
+- Supply chain uses SLSA provenance, SBOM, and signed images.
+
+### 5) Resilience (Backpressure + Idempotency)
+
+- RabbitMQ uses QoS prefetch and explicit ack; failures route to DLQ.
+- Idempotency keys are required for critical commands; agents cache recent request_ids to avoid re-execution.
+
+### 6) Operations and Extensions (WASM + Runbooks)
+
+- Policy plugins run in Wasmtime with fuel and memory limits.
+- Runbook automation triggers scripts and attaches artifacts to alerts.
+
+## v2.2 Implementation Checklist
+
+### Phase 1: The Contract
+
+- [ ] Enable gRPC JSON transcoding in Core.
+- [ ] Define Protobuf contracts for Agent/Core APIs.
+- [ ] Inject W3C trace context into RabbitMQ headers.
+
+### Phase 2: The Handshake
+
+- [ ] Add DetectCapabilities() in the Agent boot sequence.
+- [ ] Extend /register to accept Capabilities and return AgentConfig.
+- [ ] Introduce SPIRE or cert-manager based certificate rotation.
+
+### Phase 3: The Persistence
+
+- [ ] Deploy MinIO (S3 compatible) for snapshots.
+- [ ] Update ArtifactController to stream to S3 SDK.
+- [ ] Add SLSA provenance generation in CI.
+
+## Architecture (Current Data Flow)
+
+- Agent (C++) -> Core API (.NET) -> AI Engine (FastAPI) -> Core API -> PostgreSQL -> Dashboard (Next.js)
 
 ## Services
 
@@ -40,6 +94,8 @@ Control plane vs data plane:
 - ai-service: FastAPI service for volatility-based risk scoring.
 - web-service: Next.js dashboard with authentication and visualization.
 - db: PostgreSQL for persistence.
+- rabbitmq: message broker for telemetry ingestion.
+- redis: dedup cache for telemetry ingestion.
 
 ## Ports
 
@@ -47,6 +103,7 @@ Control plane vs data plane:
 - Dashboard: http://localhost:3000
 - AI Engine: http://localhost:8000
 - PostgreSQL: localhost:5432
+- RabbitMQ Management: http://localhost:15672
 
 ## Quick Start (Docker)
 
@@ -64,7 +121,7 @@ docker compose up -d --scale agent-service=2 agent-service
 
 ### Fire Drill (Demo Controller)
 
-Run the crisis trigger from the repo root:
+Trigger a market crash simulation:
 
 ```bash
 python scripts/fire_drill.py start
@@ -136,7 +193,7 @@ Risk scoring uses these rules:
 - Volatility > 5.0: CRITICAL (Market Instability)
 - Otherwise: LOW (Stable)
 
-Note: The Core API currently sends an empty spotPriceHistory list; to drive volatility decisions from spot_prices.json, wire that data into the Analyze request.
+Note: The Core API currently sends an empty spotPriceHistory list; wire that data into Analyze requests to drive volatility decisions.
 
 ## Data Model
 
@@ -154,7 +211,7 @@ TelemetryRecord persisted to PostgreSQL:
 - PredictedCpu
 - Timestamp (UTC)
 
-The Core API currently uses EnsureCreated() on startup for schema creation.
+For production, add EF Core migrations and a formal upgrade process.
 
 ## Development
 
@@ -197,34 +254,9 @@ Note: If CRIU is unavailable (Windows/Docker Desktop), the agent runs in simulat
 
 ## Security Notes
 
-- Authentication uses NextAuth Credentials for the MVP. Replace with an
-  external identity provider for production.
+- Authentication uses NextAuth Credentials for the MVP; use an external identity provider for production.
 - CORS is limited to http://localhost:3000 in development.
 - Secrets and credentials must be rotated for any public deployment.
-
-## Roadmap (Industrialization)
-
-Phase 1: Operational foundation
-- Agent registration and heartbeat
-- Offline detection and node state in the dashboard
-- Policy-based authorization in Core (RBAC)
-- Alert debouncing and suppression windows
-
-Phase 2: Actionability and control
-- Command-and-control loop (server-issued commands, agent execution)
-- Runbook links and recommended actions
-- ChatOps integration (Slack/Webhook actions)
-
-Phase 3: Insight and scalability
-- Time-series optimized storage (TimescaleDB or InfluxDB)
-- Root-cause analysis payloads from AI
-- Correlated event overlays (deployments and incidents)
-
-Phase 4: Productization
-- Role-based dashboards for SRE, Admin, and Finance
-- SLA and cost reporting
-- Audit trails, approval workflows, and zero-trust access controls
-- Mobile-friendly workflows and multi-channel alerting
 
 ## Contributing
 
