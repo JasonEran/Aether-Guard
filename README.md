@@ -35,9 +35,9 @@ Control plane vs data plane:
 
 ## Services
 
-- agent-service: C++ telemetry agent reading /proc on Linux and posting to Core.
-- core-service: ASP.NET Core API for ingestion, analysis, and data access.
-- ai-service: FastAPI service for anomaly classification (placeholder model).
+- agent-service: C++ telemetry agent with CRIU-based checkpointing (auto-falls back to simulation mode when CRIU is unavailable).
+- core-service: ASP.NET Core API for ingestion, analysis, migration orchestration, and data access.
+- ai-service: FastAPI service for volatility-based risk scoring.
 - web-service: Next.js dashboard with authentication and visualization.
 - db: PostgreSQL for persistence.
 
@@ -56,6 +56,26 @@ docker compose up --build -d
 
 Open the dashboard at http://localhost:3000.
 
+If you want to simulate migrations, start at least two agents:
+
+```bash
+docker compose up -d --scale agent-service=2 agent-service
+```
+
+### Fire Drill (Demo Controller)
+
+Run the crisis trigger from the repo root:
+
+```bash
+python scripts/fire_drill.py start
+```
+
+Reset back to stable:
+
+```bash
+python scripts/fire_drill.py stop
+```
+
 ### Default Login (Development)
 
 - Username: admin
@@ -72,6 +92,10 @@ Core API database connection (docker-compose.yml):
 
 - ConnectionStrings__DefaultConnection=Host=db;Database=AetherGuardDb;Username=postgres;Password=password
 
+Core API artifact base URL (docker-compose.yml):
+
+- ArtifactBaseUrl=http://core-service:8080
+
 Dashboard auth (docker-compose.yml):
 
 - AUTH_SECRET=super-secret-key
@@ -86,20 +110,48 @@ Core API:
 - POST /api/v1/ingestion - receive telemetry from agent
 - GET /api/v1/dashboard/latest - latest telemetry + AI analysis
 - GET /api/v1/dashboard/history - last 20 telemetry records (chronological)
+- POST /api/v1/market/signal - update market signal file
+- POST /api/v1/artifacts/upload/{workloadId} - upload snapshot
+- GET /api/v1/artifacts/download/{workloadId} - download latest snapshot
 
 AI Engine:
 
-- POST /analyze - classify telemetry as Normal or Critical
+- POST /analyze - classify telemetry with spotPriceHistory, rebalanceSignal, capacityScore
+
+## Demo Data Files
+
+The demo uses file-based signals that are mounted into containers via docker-compose:
+
+- Core signal: src/services/core-dotnet/AetherGuard.Core/Data/market_signal.json
+- AI prices: src/services/ai-engine/Data/spot_prices.json
+
+The fire drill script writes these files and creates the directories if missing.
+
+## Risk Logic (AI)
+
+Risk scoring uses these rules:
+
+- rebalanceSignal=true: CRITICAL (Cloud Provider Signal)
+- Trend > 0.2: CRITICAL (Price Spike Detected)
+- Volatility > 5.0: CRITICAL (Market Instability)
+- Otherwise: LOW (Stable)
+
+Note: The Core API currently sends an empty spotPriceHistory list; to drive volatility decisions from spot_prices.json, wire that data into the Analyze request.
 
 ## Data Model
 
 TelemetryRecord persisted to PostgreSQL:
 
 - AgentId
-- CpuUsage
-- MemoryUsage
+- WorkloadTier
+- RebalanceSignal
+- DiskAvailable
+- CpuUsage (defaults to 0 in the current pipeline)
+- MemoryUsage (defaults to 0 in the current pipeline)
 - AiStatus
 - AiConfidence
+- RootCause
+- PredictedCpu
 - Timestamp (UTC)
 
 The Core API currently uses EnsureCreated() on startup for schema creation.
@@ -140,6 +192,8 @@ cmake -S . -B build
 cmake --build build
 ./build/AetherAgent
 ```
+
+Note: If CRIU is unavailable (Windows/Docker Desktop), the agent runs in simulation mode and still produces a valid snapshot archive for demo flows.
 
 ## Security Notes
 
