@@ -22,6 +22,30 @@ v2.2 reference architecture with a concrete implementation guide.
 - License: MIT
 - Authors: Qi Junyi, Xiao Erdong (2026)
 
+## Product Delivery Standard (v2.2)
+
+This project targets a product-grade release, not a demo. The following standards are required for delivery.
+
+### UX Delivery Standard
+
+- Time-to-value (TTFV): first telemetry visible in under 15 minutes.
+- One-command deploy, one-command fire drill, one-command rollback.
+- Self-check and guidance: CLI/scripts validate dependencies, ports, CRIU/eBPF, and permissions with actionable errors.
+- Guided first-run: register agent, receive data, trigger drill, observe migration.
+- Explainability: AI risk reason, migration decision, and failures visible in the UI.
+- Recovery help: diagnostics bundle export with logs, snapshots, and config.
+- Docs-as-product: README, Quickstart, Troubleshooting, FAQ, deploy/upgrade/rollback.
+
+### Engineering Delivery Standard
+
+- Security and trust chain: auth for Agent/Telemetry/Artifact/Command, mTLS with rotation, audit logs, SBOM/SLSA/signing.
+- Reliability and resilience: idempotency, retries with backoff, rate limits, circuit breakers, MQ backpressure and DLQ.
+- Observability: OpenTelemetry traces/metrics/logs, consistent trace_id, health and readiness probes.
+- Deployment and operations: Helm + Compose, config validation, backup/restore, runbooks.
+- Data governance: schema registry and compatibility, retention/cleanup, snapshot lifecycle, migrations.
+- Compatibility and evolution: API versioning, capability negotiation, deprecation policy.
+- Performance and scale: streaming uploads/downloads, capacity baselines, horizontal scaling strategy.
+
 ## Current Implementation Snapshot (v1.x)
 
 - Agent (C++): REST/JSON telemetry; CRIU checkpointing with automatic simulation fallback.
@@ -30,6 +54,14 @@ v2.2 reference architecture with a concrete implementation guide.
 - Dashboard (Next.js): telemetry and command visibility with NextAuth credentials.
 - Storage: snapshots stored on local filesystem (Docker volume in compose).
 - Security: API key for command endpoints; no mTLS, OpenTelemetry, or schema registry yet.
+
+### Productization Gaps (v1.x)
+
+- No self-check tooling, guided onboarding, or diagnostics bundle.
+- No end-to-end auth on telemetry or artifacts; no mTLS.
+- No OpenTelemetry tracing or standardized structured logging.
+- No schema registry or compatibility policy for MQ events.
+- No object storage or retention policy for snapshots.
 
 ## v2.2 Reference Architecture
 
@@ -64,6 +96,14 @@ v2.2 reference architecture with a concrete implementation guide.
 - Runbook automation triggers scripts and attaches artifacts to alerts.
 
 ## v2.2 Implementation Checklist
+
+### Phase 0: Product Readiness
+
+- [ ] Add self-check scripts (agent/core dependencies, ports, permissions).
+- [ ] Add first-run guide in the dashboard.
+- [ ] Add explainability fields and failure reasons in UI.
+- [ ] Add diagnostics bundle export.
+- [ ] Expand docs: Quickstart, Troubleshooting, FAQ, upgrade/rollback.
 
 ### Phase 1: The Contract
 
@@ -119,6 +159,14 @@ If you want to simulate migrations, start at least two agents:
 docker compose up -d --scale agent-service=2 agent-service
 ```
 
+### First Run Path (Target <=15 minutes)
+
+1. `docker compose up --build -d`
+2. Open http://localhost:3000 and log in.
+3. Start at least two agents (see command above).
+4. Run the fire drill: `python scripts/fire_drill.py start`
+5. Confirm the dashboard shows risk state changes and migration activity.
+
 ### Fire Drill (Demo Controller)
 
 Trigger a market crash simulation:
@@ -132,6 +180,14 @@ Reset back to stable:
 ```bash
 python scripts/fire_drill.py stop
 ```
+
+### Verification Scripts (Demo)
+
+These scripts validate demo flows and can be reused as product readiness checks:
+
+- `verify_blueprint_v1.py`
+- `verify_phase2.py`
+- `verify_phase3.py`
 
 ### Default Login (Development)
 
