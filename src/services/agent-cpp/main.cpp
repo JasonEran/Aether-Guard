@@ -5,9 +5,15 @@
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
+#include <string>
 #include <thread>
-#include <unistd.h>
 #include <vector>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 int main() {
     std::cout << "Aether Agent Starting..." << std::endl;
@@ -18,9 +24,16 @@ int main() {
 
     std::string hostname = "unknown-host";
     char hostnameBuffer[256] = {};
+#ifdef _WIN32
+    DWORD hostnameSize = static_cast<DWORD>(sizeof(hostnameBuffer));
+    if (GetComputerNameA(hostnameBuffer, &hostnameSize) != 0) {
+        hostname = hostnameBuffer;
+    }
+#else
     if (gethostname(hostnameBuffer, sizeof(hostnameBuffer)) == 0) {
         hostname = hostnameBuffer;
     }
+#endif
 
     std::string token;
     std::string agentId;
