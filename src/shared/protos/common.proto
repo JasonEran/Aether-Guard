@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package aetherguard.common.v1;
+
+import "google/protobuf/struct.proto";
+
+option csharp_namespace = "AetherGuard.Grpc.V1";
+
+message TelemetryRecord {
+  string agent_id = 1;
+  int64 timestamp = 2;
+  string workload_tier = 3;
+  bool rebalance_signal = 4;
+  int64 disk_available = 5;
+}
+
+message AgentCommand {
+  int32 id = 1;
+  string command_id = 2;
+  string workload_id = 3;
+  string action = 4;
+  google.protobuf.Struct parameters = 5;
+  string nonce = 6;
+  string signature = 7;
+  string expires_at = 8;
+}

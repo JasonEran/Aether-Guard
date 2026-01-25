@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AetherGuard.Core.Services;
+using GrpcQueueCommandRequest = AetherGuard.Grpc.V1.QueueCommandRequest;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AetherGuard.Core.Controllers;
@@ -9,12 +10,12 @@ namespace AetherGuard.Core.Controllers;
 [Route("api/v1/commands")]
 public class CommandsController : ControllerBase
 {
-    private readonly CommandService _commandService;
+    private readonly ControlPlaneService _controlPlaneService;
     private readonly ILogger<CommandsController> _logger;
 
-    public CommandsController(CommandService commandService, ILogger<CommandsController> logger)
+    public CommandsController(ControlPlaneService controlPlaneService, ILogger<CommandsController> logger)
     {
-        _commandService = commandService;
+        _controlPlaneService = controlPlaneService;
         _logger = logger;
     }
 
@@ -22,35 +23,37 @@ public class CommandsController : ControllerBase
     [HttpPost("/commands/queue")]
     public async Task<IActionResult> Queue([FromBody] QueueCommandRequest request, CancellationToken cancellationToken)
     {
-        if (request is null || string.IsNullOrWhiteSpace(request.WorkloadId))
+        var parametersJson = request?.Params.ValueKind == JsonValueKind.Undefined
+            ? string.Empty
+            : request?.Params.GetRawText() ?? string.Empty;
+
+        var grpcRequest = new GrpcQueueCommandRequest
         {
-            return BadRequest(new { error = "WorkloadId is required." });
+            WorkloadId = request?.WorkloadId ?? string.Empty,
+            Action = request?.Action ?? string.Empty,
+            Params = GrpcParameterConverter.ParseJsonStruct(parametersJson)
+        };
+
+        var result = await _controlPlaneService.QueueCommandAsync(grpcRequest, cancellationToken);
+        if (!result.Success)
+        {
+            return StatusCode(result.StatusCode, result.ErrorPayload);
         }
 
-        if (string.IsNullOrWhiteSpace(request.Action))
+        if (result.Payload is null)
         {
-            return BadRequest(new { error = "Action is required." });
+            return StatusCode(StatusCodes.Status500InternalServerError);
         }
 
-        object parameters = request.Params.ValueKind == JsonValueKind.Undefined
-            ? new object()
-            : request.Params;
-
-        var command = await _commandService.QueueCommand(
-            request.WorkloadId.Trim(),
-            request.Action.Trim(),
-            parameters,
-            cancellationToken);
-
-        _logger.LogInformation("Queued command {CommandId} for workload {WorkloadId}", command.CommandId, request.WorkloadId);
+        _logger.LogInformation("Queued command {CommandId} for workload {WorkloadId}", result.Payload.CommandId, request?.WorkloadId);
 
         return Accepted(new
         {
-            status = "queued",
-            commandId = command.CommandId,
-            nonce = command.Nonce,
-            signature = command.Signature,
-            expiresAt = command.ExpiresAt
+            status = result.Payload.Status,
+            commandId = result.Payload.CommandId,
+            nonce = result.Payload.Nonce,
+            signature = result.Payload.Signature,
+            expiresAt = result.Payload.ExpiresAt
         });
     }
 

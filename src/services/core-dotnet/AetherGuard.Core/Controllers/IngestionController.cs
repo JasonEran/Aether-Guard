@@ -1,8 +1,6 @@
 using AetherGuard.Core.Models;
 using AetherGuard.Core.Services;
-using AetherGuard.Core.Services.Messaging;
 using Microsoft.AspNetCore.Mvc;
-using StackExchange.Redis;
 
 namespace AetherGuard.Core.Controllers;
 
@@ -11,69 +9,46 @@ namespace AetherGuard.Core.Controllers;
 public class IngestionController : ControllerBase
 {
     private readonly ILogger<IngestionController> _logger;
-    private readonly IConnectionMultiplexer _redis;
-    private readonly IMessageProducer _producer;
+    private readonly TelemetryIngestionService _ingestionService;
 
     public IngestionController(
         ILogger<IngestionController> logger,
-        IConnectionMultiplexer redis,
-        IMessageProducer producer)
+        TelemetryIngestionService ingestionService)
     {
         _logger = logger;
-        _redis = redis;
-        _producer = producer;
+        _ingestionService = ingestionService;
     }
 
     // POST: api/v1/ingestion
     [HttpPost]
     public async Task<IActionResult> ReceiveTelemetry([FromBody] TelemetryPayload payload)
     {
-        if (payload is null)
+        var record = new AetherGuard.Grpc.V1.TelemetryRecord
         {
-            return BadRequest("Telemetry payload is required.");
+            AgentId = payload?.AgentId ?? string.Empty,
+            Timestamp = payload?.Timestamp ?? 0,
+            WorkloadTier = payload?.WorkloadTier ?? string.Empty,
+            RebalanceSignal = payload?.RebalanceSignal ?? false,
+            DiskAvailable = payload?.DiskAvailable ?? 0
+        };
+
+        var result = await _ingestionService.IngestAsync(record, HttpContext.RequestAborted);
+        if (!result.Success)
+        {
+            return StatusCode(result.StatusCode, result.ErrorPayload);
         }
 
-        if (string.IsNullOrWhiteSpace(payload.AgentId))
+        if (result.Payload is null)
         {
-            return BadRequest("AgentId is required.");
+            return StatusCode(StatusCodes.Status500InternalServerError);
         }
 
-        if (payload.Timestamp <= 0)
+        if (result.Payload.IsDuplicate)
         {
-            return BadRequest("Timestamp is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(payload.WorkloadTier))
-        {
-            return BadRequest("WorkloadTier is required.");
-        }
-
-        var tier = payload.WorkloadTier.Trim().ToUpperInvariant();
-        if (tier is not ("T1" or "T2" or "T3"))
-        {
-            _logger.LogWarning("Received invalid tier data from {AgentId}", payload.AgentId);
-            return BadRequest("Invalid WorkloadTier value.");
-        }
-
-        if (payload.DiskAvailable < 0)
-        {
-            _logger.LogWarning("Received invalid disk data from {AgentId}", payload.AgentId);
-            return BadRequest("Invalid DiskAvailable value.");
-        }
-
-        var dedupKey = $"dedup:{payload.AgentId}:{payload.Timestamp}";
-        var database = _redis.GetDatabase();
-        var setResult = await database.StringSetAsync(dedupKey, "1", TimeSpan.FromSeconds(10), When.NotExists);
-
-        if (!setResult)
-        {
-            _logger.LogInformation("[Telemetry] Duplicate payload ignored for {AgentId}", payload.AgentId);
+            _logger.LogInformation("[Telemetry] Duplicate payload ignored for {AgentId}", payload?.AgentId);
             return Accepted("Duplicate");
         }
 
-        _producer.SendMessage(payload);
-        _logger.LogInformation("[Telemetry] Enqueued payload for {AgentId}", payload.AgentId);
-
-        return Accepted(new { status = "queued", timestamp = DateTime.UtcNow });
+        return Accepted(new { status = "queued", timestamp = result.Payload.EnqueuedAt.UtcDateTime });
     }
 }

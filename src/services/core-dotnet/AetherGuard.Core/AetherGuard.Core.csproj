@@ -7,6 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Google.Api.CommonProtos" Version="2.17.0" />
+    <PackageReference Include="Google.Protobuf" Version="3.31.1" />
+    <PackageReference Include="Grpc.AspNetCore" Version="2.62.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Grpc.JsonTranscoding" Version="8.0.23" />
+    <PackageReference Include="Grpc.Tools" Version="2.62.0" PrivateAssets="All" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.23" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0" />
@@ -16,6 +21,18 @@
     <PackageReference Include="RabbitMQ.Client" Version="7.2.0" />
     <PackageReference Include="StackExchange.Redis" Version="2.10.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Protobuf Include="..\..\..\shared\protos\common.proto"
+              GrpcServices="None"
+              AdditionalImportDirs="..\..\..\shared\protos" />
+    <Protobuf Include="..\..\..\shared\protos\agent_service.proto"
+              GrpcServices="Server"
+              AdditionalImportDirs="..\..\..\shared\protos" />
+    <Protobuf Include="..\..\..\shared\protos\control_plane.proto"
+              GrpcServices="Server"
+              AdditionalImportDirs="..\..\..\shared\protos" />
   </ItemGroup>
 
 </Project>

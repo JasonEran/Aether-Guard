@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package aetherguard.control.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/struct.proto";
+
+option csharp_namespace = "AetherGuard.Grpc.V1";
+
+service ControlPlane {
+  rpc QueueCommand(QueueCommandRequest) returns (QueueCommandResponse) {
+    option (google.api.http) = {
+      post: "/api/v2/commands/queue"
+      body: "*"
+    };
+  }
+
+  rpc GetDashboardLatest(GetDashboardLatestRequest) returns (DashboardLatestResponse) {
+    option (google.api.http) = {
+      get: "/api/v2/dashboard/latest"
+    };
+  }
+
+  rpc GetDashboardHistory(GetDashboardHistoryRequest) returns (DashboardHistoryResponse) {
+    option (google.api.http) = {
+      get: "/api/v2/dashboard/history"
+    };
+  }
+}
+
+message QueueCommandRequest {
+  string workload_id = 1;
+  string action = 2;
+  google.protobuf.Struct params = 3;
+}
+
+message QueueCommandResponse {
+  string status = 1;
+  string command_id = 2;
+  string nonce = 3;
+  string signature = 4;
+  string expires_at = 5;
+}
+
+message GetDashboardLatestRequest {}
+
+message DashboardLatestResponse {
+  DashboardTelemetry telemetry = 1;
+  DashboardAnalysis analysis = 2;
+}
+
+message DashboardTelemetry {
+  string agent_id = 1;
+  string workload_tier = 2;
+  bool rebalance_signal = 3;
+  int64 disk_available = 4;
+  int64 timestamp = 5;
+}
+
+message DashboardAnalysis {
+  string status = 1;
+  double confidence = 2;
+  double predicted_cpu = 3;
+  string root_cause = 4;
+}
+
+message GetDashboardHistoryRequest {
+  int32 limit = 1;
+}
+
+message TelemetryHistoryEntry {
+  int64 id = 1;
+  string agent_id = 2;
+  string workload_tier = 3;
+  bool rebalance_signal = 4;
+  int64 disk_available = 5;
+  string ai_status = 6;
+  double ai_confidence = 7;
+  double predicted_cpu = 8;
+  string root_cause = 9;
+  string timestamp = 10;
+}
+
+message DashboardHistoryResponse {
+  repeated TelemetryHistoryEntry records = 1;
+}

@@ -1,6 +1,6 @@
-using AetherGuard.Core.Data;
+using System.Globalization;
 using AetherGuard.Core.Services;
-using Microsoft.EntityFrameworkCore;
+using AetherGuard.Grpc.V1;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AetherGuard.Core.Controllers;
@@ -9,40 +9,41 @@ namespace AetherGuard.Core.Controllers;
 [Route("api/v1/dashboard")]
 public class DashboardController : ControllerBase
 {
-    private readonly TelemetryStore _store;
-    private readonly ApplicationDbContext _context;
+    private readonly ControlPlaneService _controlPlaneService;
 
-    public DashboardController(TelemetryStore store, ApplicationDbContext context)
+    public DashboardController(ControlPlaneService controlPlaneService)
     {
-        _store = store;
-        _context = context;
+        _controlPlaneService = controlPlaneService;
     }
 
     [HttpGet("latest")]
     public IActionResult GetLatest()
     {
-        var latest = _store.GetLatest();
-        if (latest is null)
+        var result = _controlPlaneService.GetLatest();
+        if (!result.Success)
         {
-            return NotFound();
+            return StatusCode(result.StatusCode);
         }
 
-        var analysis = latest.Analysis is null
-            ? null
-            : new DashboardAnalysisDto(
-                latest.Analysis.Status,
-                latest.Analysis.Confidence,
-                ClampPrediction(latest.Analysis.Prediction),
-                latest.Analysis.RootCause);
+        if (result.Payload is null)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError);
+        }
 
         var response = new DashboardLatestDto(
             new DashboardTelemetryDto(
-                latest.Telemetry.AgentId,
-                latest.Telemetry.WorkloadTier,
-                latest.Telemetry.RebalanceSignal,
-                latest.Telemetry.DiskAvailable,
-                latest.Telemetry.Timestamp),
-            analysis);
+                result.Payload.Telemetry.AgentId,
+                result.Payload.Telemetry.WorkloadTier,
+                result.Payload.Telemetry.RebalanceSignal,
+                result.Payload.Telemetry.DiskAvailable,
+                result.Payload.Telemetry.Timestamp),
+            result.Payload.Analysis is null
+                ? null
+                : new DashboardAnalysisDto(
+                    result.Payload.Analysis.Status,
+                    result.Payload.Analysis.Confidence,
+                    ClampPrediction(result.Payload.Analysis.PredictedCpu),
+                    result.Payload.Analysis.RootCause));
 
         return Ok(response);
     }
@@ -50,9 +51,20 @@ public class DashboardController : ControllerBase
     [HttpGet("history")]
     public async Task<IActionResult> GetHistory()
     {
-        var records = await _context.TelemetryRecords
-            .OrderByDescending(x => x.Timestamp)
-            .Take(20)
+        var result = await _controlPlaneService.GetHistoryAsync(
+            new GetDashboardHistoryRequest { Limit = 20 },
+            HttpContext.RequestAborted);
+        if (!result.Success)
+        {
+            return StatusCode(result.StatusCode);
+        }
+
+        if (result.Payload is null)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError);
+        }
+
+        var records = result.Payload.Records
             .Select(record => new TelemetryHistoryDto(
                 record.Id,
                 record.AgentId,
@@ -62,11 +74,9 @@ public class DashboardController : ControllerBase
                 record.AiStatus,
                 record.AiConfidence,
                 ClampPrediction(record.PredictedCpu),
-                record.RootCause,
-                record.Timestamp))
-            .ToListAsync();
-
-        records.Reverse();
+                string.IsNullOrWhiteSpace(record.RootCause) ? null : record.RootCause,
+                DateTime.Parse(record.Timestamp, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)))
+            .ToList();
 
         return Ok(records);
     }

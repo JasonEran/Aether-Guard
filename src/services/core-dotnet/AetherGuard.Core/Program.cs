@@ -9,9 +9,13 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddGrpc().AddJsonTranscoding();
 
 builder.Services.AddSingleton<TelemetryStore>();
 builder.Services.AddHttpClient<AnalysisService>();
+builder.Services.AddScoped<AgentWorkflowService>();
+builder.Services.AddScoped<TelemetryIngestionService>();
+builder.Services.AddScoped<ControlPlaneService>();
 builder.Services.AddScoped<CommandService>();
 builder.Services.AddScoped<MigrationOrchestrator>();
 builder.Services.AddSingleton<IMessageProducer, RabbitMQProducer>();
@@ -57,6 +61,8 @@ app.UseHttpsRedirection();
 app.UseCors("AllowDashboard");
 app.UseAuthorization();
 
+app.MapGrpcService<AetherGuard.Core.Grpc.AgentGrpcService>();
+app.MapGrpcService<AetherGuard.Core.Grpc.ControlPlaneGrpcService>();
 app.MapControllers();
 
 app.Run();

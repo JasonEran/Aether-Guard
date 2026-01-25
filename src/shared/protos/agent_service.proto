@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package aetherguard.agent.v1;
+
+import "common.proto";
+import "google/api/annotations.proto";
+
+option csharp_namespace = "AetherGuard.Grpc.V1";
+
+service AgentService {
+  rpc Register(RegisterRequest) returns (RegisterResponse) {
+    option (google.api.http) = {
+      post: "/api/v2/agent/register"
+      body: "*"
+    };
+  }
+
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse) {
+    option (google.api.http) = {
+      post: "/api/v2/agent/heartbeat"
+      body: "*"
+    };
+  }
+
+  rpc PollCommands(PollCommandsRequest) returns (PollCommandsResponse) {
+    option (google.api.http) = {
+      get: "/api/v2/agent/poll"
+    };
+  }
+
+  rpc SendFeedback(FeedbackRequest) returns (FeedbackResponse) {
+    option (google.api.http) = {
+      post: "/api/v2/agent/feedback"
+      body: "*"
+    };
+  }
+
+  rpc IngestTelemetry(aetherguard.common.v1.TelemetryRecord) returns (TelemetryAck) {
+    option (google.api.http) = {
+      post: "/api/v2/ingestion"
+      body: "*"
+    };
+  }
+}
+
+message RegisterRequest {
+  string hostname = 1;
+  string os = 2;
+}
+
+message RegisterResponse {
+  string token = 1;
+  string agent_id = 2;
+}
+
+message HeartbeatRequest {
+  string token = 1;
+}
+
+message HeartbeatResponse {
+  string status = 1;
+  repeated aetherguard.common.v1.AgentCommand commands = 2;
+}
+
+message PollCommandsRequest {
+  string agent_id = 1;
+}
+
+message PollCommandsResponse {
+  repeated aetherguard.common.v1.AgentCommand commands = 1;
+}
+
+message FeedbackRequest {
+  string agent_id = 1;
+  string command_id = 2;
+  string status = 3;
+  string result = 4;
+  string error = 5;
+}
+
+message FeedbackResponse {
+  string status = 1;
+}
+
+message TelemetryAck {
+  string status = 1;
+  int64 timestamp = 2;
+}
