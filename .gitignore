@@ -23,6 +23,8 @@ CMakeCache.txt
 cmake_install.cmake
 Makefile
 build/
+src/services/agent-cpp/build*/
+src/services/agent-cpp/build_*/
 *.o
 *.obj
 *.exe

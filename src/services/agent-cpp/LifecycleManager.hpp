@@ -21,6 +21,7 @@ public:
     LifecycleManager(NetworkClient& client, std::string orchestratorBaseUrl);
 
     bool PreFlightCheck() const;
+    bool IsCriuAvailable() const;
     std::string Checkpoint(const std::string& workloadId);
     bool Transfer(const std::string& snapshotPath, const std::string& targetIp);
     bool Restore(const std::string& snapshotPath);

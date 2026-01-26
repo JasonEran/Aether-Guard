@@ -64,6 +64,10 @@ bool LifecycleManager::PreFlightCheck() const {
     return diskOk;
 }
 
+bool LifecycleManager::IsCriuAvailable() const {
+    return criu_available_;
+}
+
 std::string LifecycleManager::Checkpoint(const std::string& workloadId) {
     if (workloadId.empty()) {
         return {};

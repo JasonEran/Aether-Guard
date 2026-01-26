@@ -22,7 +22,19 @@ public class AgentController : ControllerBase
         var grpcRequest = new RegisterRequest
         {
             Hostname = request?.Hostname ?? string.Empty,
-            Os = request?.Os ?? string.Empty
+            Os = request?.Os ?? string.Empty,
+            Capabilities = request?.Capabilities is null
+                ? new AgentCapabilities()
+                : new AgentCapabilities
+                {
+                    KernelVersion = request.Capabilities.KernelVersion ?? string.Empty,
+                    CriuVersion = request.Capabilities.CriuVersion ?? string.Empty,
+                    CriuAvailable = request.Capabilities.CriuAvailable,
+                    EbpfAvailable = request.Capabilities.EbpfAvailable,
+                    SupportsSnapshot = request.Capabilities.SupportsSnapshot,
+                    SupportsNetTopology = request.Capabilities.SupportsNetTopology,
+                    SupportsChaos = request.Capabilities.SupportsChaos
+                }
         };
 
         var result = await _workflowService.RegisterAsync(grpcRequest, cancellationToken);
@@ -31,7 +43,19 @@ public class AgentController : ControllerBase
             return StatusCode(result.StatusCode, result.ErrorPayload);
         }
 
-        return Ok(new { token = result.Payload?.Token, agentId = result.Payload?.AgentId });
+        var config = result.Payload?.Config;
+        var configPayload = config is null
+            ? null
+            : new
+            {
+                enableSnapshot = config.EnableSnapshot,
+                enableEbpf = config.EnableEbpf,
+                enableNetTopology = config.EnableNetTopology,
+                enableChaos = config.EnableChaos,
+                nodeMode = config.NodeMode
+            };
+
+        return Ok(new { token = result.Payload?.Token, agentId = result.Payload?.AgentId, config = configPayload });
     }
 
     [HttpPost("heartbeat")]
@@ -126,6 +150,18 @@ public class AgentController : ControllerBase
     {
         public string Hostname { get; set; } = string.Empty;
         public string Os { get; set; } = string.Empty;
+        public AgentCapabilitiesRequest? Capabilities { get; set; }
+    }
+
+    public sealed class AgentCapabilitiesRequest
+    {
+        public string? KernelVersion { get; set; }
+        public string? CriuVersion { get; set; }
+        public bool CriuAvailable { get; set; }
+        public bool EbpfAvailable { get; set; }
+        public bool SupportsSnapshot { get; set; }
+        public bool SupportsNetTopology { get; set; }
+        public bool SupportsChaos { get; set; }
     }
 
     public sealed class HeartbeatRequest

@@ -49,10 +49,25 @@ void LogRetry(int attempt) {
 NetworkClient::NetworkClient(std::string baseUrl)
     : baseUrl_(std::move(baseUrl)) {}
 
-bool NetworkClient::Register(const std::string& hostname, std::string& outToken, std::string& outAgentId) {
+bool NetworkClient::Register(
+    const std::string& hostname,
+    const std::string& os,
+    const AgentCapabilities& capabilities,
+    std::string& outToken,
+    std::string& outAgentId,
+    AgentConfig* outConfig) {
     nlohmann::json payload = {
         {"hostname", hostname},
-        {"os", "Linux"}
+        {"os", os},
+        {"capabilities", {
+            {"kernelVersion", capabilities.kernelVersion},
+            {"criuVersion", capabilities.criuVersion},
+            {"criuAvailable", capabilities.criuAvailable},
+            {"ebpfAvailable", capabilities.ebpfAvailable},
+            {"supportsSnapshot", capabilities.supportsSnapshot},
+            {"supportsNetTopology", capabilities.supportsNetTopology},
+            {"supportsChaos", capabilities.supportsChaos}
+        }}
     };
 
     cpr::Response response = cpr::Post(
@@ -78,6 +93,14 @@ bool NetworkClient::Register(const std::string& hostname, std::string& outToken,
 
     outToken = json.value("token", "");
     outAgentId = json.value("agentId", "");
+    if (outConfig != nullptr && json.contains("config") && json["config"].is_object()) {
+        const auto& config = json["config"];
+        outConfig->enableSnapshot = config.value("enableSnapshot", false);
+        outConfig->enableEbpf = config.value("enableEbpf", false);
+        outConfig->enableNetTopology = config.value("enableNetTopology", false);
+        outConfig->enableChaos = config.value("enableChaos", false);
+        outConfig->nodeMode = config.value("nodeMode", "");
+    }
     return !outToken.empty() && !outAgentId.empty();
 }
 

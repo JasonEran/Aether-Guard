@@ -15,6 +15,7 @@ public class MigrationOrchestrator
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly CommandService _commandService;
     private readonly AnalysisService _analysisService;
+    private readonly SnapshotStorageService _snapshotStorage;
     private readonly IConfiguration _configuration;
     private readonly IWebHostEnvironment _environment;
     private readonly ILogger<MigrationOrchestrator> _logger;
@@ -23,6 +24,7 @@ public class MigrationOrchestrator
         IServiceScopeFactory serviceScopeFactory,
         CommandService commandService,
         AnalysisService analysisService,
+        SnapshotStorageService snapshotStorage,
         IConfiguration configuration,
         IWebHostEnvironment environment,
         ILogger<MigrationOrchestrator> logger)
@@ -30,6 +32,7 @@ public class MigrationOrchestrator
         _serviceScopeFactory = serviceScopeFactory;
         _commandService = commandService;
         _analysisService = analysisService;
+        _snapshotStorage = snapshotStorage;
         _configuration = configuration;
         _environment = environment;
         _logger = logger;
@@ -125,8 +128,7 @@ public class MigrationOrchestrator
             return;
         }
 
-        var snapshotPath = FindLatestSnapshotPath(sourceAgentId);
-        if (snapshotPath is null)
+        if (!await _snapshotStorage.HasSnapshotAsync(sourceAgentId, cancellationToken))
         {
             _logger.LogWarning("Snapshot artifact not found for {SourceAgentId}", sourceAgentId);
             return;
@@ -321,28 +323,6 @@ public class MigrationOrchestrator
         }
 
         return (false, false);
-    }
-
-    private string? FindLatestSnapshotPath(string workloadId)
-    {
-        var storagePath = _configuration["StoragePath"] ?? "Data/Snapshots";
-        var storageRoot = Path.IsPathRooted(storagePath)
-            ? storagePath
-            : Path.Combine(_environment.ContentRootPath, storagePath);
-        var safeWorkloadId = Path.GetFileName(workloadId);
-        var workloadDir = Path.Combine(storageRoot, safeWorkloadId);
-
-        if (!Directory.Exists(workloadDir))
-        {
-            return null;
-        }
-
-        var latestFile = new DirectoryInfo(workloadDir)
-            .GetFiles("*.tar.gz")
-            .OrderByDescending(file => file.LastWriteTimeUtc)
-            .FirstOrDefault();
-
-        return latestFile?.FullName;
     }
 
     private string BuildDownloadUrl(string workloadId)

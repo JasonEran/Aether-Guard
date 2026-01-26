@@ -46,15 +46,35 @@ service AgentService {
 message RegisterRequest {
   string hostname = 1;
   string os = 2;
+  AgentCapabilities capabilities = 3;
 }
 
 message RegisterResponse {
   string token = 1;
   string agent_id = 2;
+  AgentConfig config = 3;
 }
 
 message HeartbeatRequest {
   string token = 1;
+}
+
+message AgentCapabilities {
+  string kernel_version = 1;
+  string criu_version = 2;
+  bool criu_available = 3;
+  bool ebpf_available = 4;
+  bool supports_snapshot = 5;
+  bool supports_net_topology = 6;
+  bool supports_chaos = 7;
+}
+
+message AgentConfig {
+  bool enable_snapshot = 1;
+  bool enable_ebpf = 2;
+  bool enable_net_topology = 3;
+  bool enable_chaos = 4;
+  string node_mode = 5;
 }
 
 message HeartbeatResponse {

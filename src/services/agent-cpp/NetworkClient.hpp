@@ -25,11 +25,35 @@ struct CommandFeedback {
     std::string error;
 };
 
+struct AgentCapabilities {
+    std::string kernelVersion;
+    std::string criuVersion;
+    bool criuAvailable = false;
+    bool ebpfAvailable = false;
+    bool supportsSnapshot = false;
+    bool supportsNetTopology = false;
+    bool supportsChaos = false;
+};
+
+struct AgentConfig {
+    bool enableSnapshot = false;
+    bool enableEbpf = false;
+    bool enableNetTopology = false;
+    bool enableChaos = false;
+    std::string nodeMode;
+};
+
 class NetworkClient {
 public:
     explicit NetworkClient(std::string baseUrl);
 
-    bool Register(const std::string& hostname, std::string& outToken, std::string& outAgentId);
+    bool Register(
+        const std::string& hostname,
+        const std::string& os,
+        const AgentCapabilities& capabilities,
+        std::string& outToken,
+        std::string& outAgentId,
+        AgentConfig* outConfig = nullptr);
     bool SendHeartbeat(
         const std::string& token,
         const std::string& agentId,

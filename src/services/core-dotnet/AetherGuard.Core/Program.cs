@@ -18,6 +18,7 @@ builder.Services.AddScoped<TelemetryIngestionService>();
 builder.Services.AddScoped<ControlPlaneService>();
 builder.Services.AddScoped<CommandService>();
 builder.Services.AddScoped<MigrationOrchestrator>();
+builder.Services.AddSingleton<SnapshotStorageService>();
 builder.Services.AddSingleton<IMessageProducer, RabbitMQProducer>();
 builder.Services.AddHostedService<TelemetryProcessor>();
 builder.Services.AddHostedService<MigrationCycleService>();

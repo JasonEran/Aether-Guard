@@ -36,7 +36,8 @@ public class AgentWorkflowService
             return ApiResult<RegisterResponse>.Ok(new RegisterResponse
             {
                 Token = existingAgent.AgentToken,
-                AgentId = existingAgent.Id.ToString()
+                AgentId = existingAgent.Id.ToString(),
+                Config = BuildAgentConfig(request.Capabilities)
             });
         }
 
@@ -55,8 +56,24 @@ public class AgentWorkflowService
         return ApiResult<RegisterResponse>.Ok(new RegisterResponse
         {
             Token = agent.AgentToken,
-            AgentId = agent.Id.ToString()
+            AgentId = agent.Id.ToString(),
+            Config = BuildAgentConfig(request.Capabilities)
         });
+    }
+
+    private static AgentConfig BuildAgentConfig(AgentCapabilities? capabilities)
+    {
+        var criuAvailable = capabilities?.CriuAvailable == true;
+        var config = new AgentConfig
+        {
+            EnableSnapshot = criuAvailable && capabilities?.SupportsSnapshot != false,
+            EnableEbpf = capabilities?.EbpfAvailable == true,
+            EnableNetTopology = capabilities?.SupportsNetTopology == true,
+            EnableChaos = capabilities?.SupportsChaos == true,
+            NodeMode = criuAvailable ? "STATEFUL" : "STATELESS"
+        };
+
+        return config;
     }
 
     public async Task<ApiResult<HeartbeatResponse>> HeartbeatAsync(HeartbeatRequest request, CancellationToken cancellationToken)

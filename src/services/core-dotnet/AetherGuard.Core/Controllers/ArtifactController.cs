@@ -1,5 +1,5 @@
 using System.IO;
-using System.Linq;
+using AetherGuard.Core.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,17 +10,14 @@ namespace AetherGuard.Core.Controllers;
 public class ArtifactController : ControllerBase
 {
     private readonly ILogger<ArtifactController> _logger;
-    private readonly IWebHostEnvironment _environment;
-    private readonly string _storagePath;
+    private readonly SnapshotStorageService _snapshotStorage;
 
     public ArtifactController(
-        IConfiguration configuration,
-        IWebHostEnvironment environment,
+        SnapshotStorageService snapshotStorage,
         ILogger<ArtifactController> logger)
     {
         _logger = logger;
-        _environment = environment;
-        _storagePath = configuration["StoragePath"] ?? "Data/Snapshots";
+        _snapshotStorage = snapshotStorage;
     }
 
     [HttpPost("upload/{workloadId}")]
@@ -46,33 +43,33 @@ public class ArtifactController : ControllerBase
             return BadRequest(new { error = "Invalid workload identifier." });
         }
 
-        var storageRoot = ResolveStorageRoot();
-        var workloadDir = Path.Combine(storageRoot, safeWorkloadId);
-        Directory.CreateDirectory(workloadDir);
-
-        var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmssfff");
-        var fileName = $"{timestamp}.tar.gz";
-        var filePath = Path.Combine(workloadDir, fileName);
-
-        await using (var stream = new FileStream(
-            filePath,
-            FileMode.Create,
-            FileAccess.Write,
-            FileShare.None,
-            81920,
-            useAsync: true))
+        string? storedName;
+        try
         {
-            await file.CopyToAsync(stream, cancellationToken);
+            storedName = await _snapshotStorage.StoreSnapshotAsync(
+                safeWorkloadId,
+                file,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Snapshot storage failed for {WorkloadId}.", safeWorkloadId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Snapshot storage failed." });
+        }
+
+        if (string.IsNullOrWhiteSpace(storedName))
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Snapshot storage failed." });
         }
 
         _logger.LogInformation("Snapshot received, size: {Size}", file.Length);
 
-        return Ok(new { status = "stored", file = fileName });
+        return Ok(new { status = "stored", file = storedName });
     }
 
     [HttpGet("download/{workloadId}")]
     [HttpGet("/download/{workloadId}")]
-    public IActionResult Download(string workloadId)
+    public async Task<IActionResult> Download(string workloadId, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(workloadId))
         {
@@ -85,36 +82,31 @@ public class ArtifactController : ControllerBase
             return BadRequest(new { error = "Invalid workload identifier." });
         }
 
-        var workloadDir = Path.Combine(ResolveStorageRoot(), safeWorkloadId);
-        if (!Directory.Exists(workloadDir))
+        SnapshotDownload? snapshot;
+        try
+        {
+            snapshot = await _snapshotStorage.OpenLatestSnapshotAsync(safeWorkloadId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Snapshot download failed for {WorkloadId}.", safeWorkloadId);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Snapshot download failed." });
+        }
+
+        if (snapshot is null)
         {
             return NotFound(new { error = "Snapshot not found." });
         }
 
-        var latestFile = new DirectoryInfo(workloadDir)
-            .GetFiles("*.tar.gz")
-            .OrderByDescending(file => file.LastWriteTimeUtc)
-            .FirstOrDefault();
-
-        if (latestFile is null)
+        if (snapshot.Disposable is not null)
         {
-            return NotFound(new { error = "Snapshot not found." });
+            HttpContext.Response.RegisterForDispose(snapshot.Disposable);
         }
 
-        return PhysicalFile(
-            latestFile.FullName,
+        return File(
+            snapshot.Stream,
             "application/gzip",
-            latestFile.Name,
+            snapshot.FileName,
             enableRangeProcessing: true);
-    }
-
-    private string ResolveStorageRoot()
-    {
-        if (Path.IsPathRooted(_storagePath))
-        {
-            return _storagePath;
-        }
-
-        return Path.Combine(_environment.ContentRootPath, _storagePath);
     }
 }

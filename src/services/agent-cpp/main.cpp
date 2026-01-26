@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <cstdlib>
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -12,8 +13,41 @@
 #ifdef _WIN32
 #include <windows.h>
 #else
+#include <sys/utsname.h>
 #include <unistd.h>
 #endif
+
+namespace {
+std::string DetectOsName() {
+#ifdef _WIN32
+    return "Windows";
+#elif __APPLE__
+    return "macOS";
+#else
+    return "Linux";
+#endif
+}
+
+std::string DetectKernelVersion() {
+#ifdef _WIN32
+    return "windows";
+#else
+    struct utsname info;
+    if (uname(&info) == 0) {
+        return info.release;
+    }
+    return {};
+#endif
+}
+
+bool DetectEbpfAvailable() {
+#ifdef _WIN32
+    return false;
+#else
+    return std::filesystem::exists("/sys/fs/bpf");
+#endif
+}
+} // namespace
 
 int main() {
     std::cout << "Aether Agent Starting..." << std::endl;
@@ -35,11 +69,26 @@ int main() {
     }
 #endif
 
+    const std::string osName = DetectOsName();
+    AgentCapabilities capabilities;
+    capabilities.kernelVersion = DetectKernelVersion();
+    capabilities.criuAvailable = lifecycle.IsCriuAvailable();
+    capabilities.ebpfAvailable = DetectEbpfAvailable();
+    capabilities.supportsSnapshot = capabilities.criuAvailable;
+    capabilities.supportsNetTopology = false;
+    capabilities.supportsChaos = false;
+
     std::string token;
     std::string agentId;
+    AgentConfig agentConfig;
     while (token.empty() || agentId.empty()) {
-        if (client.Register(hostname, token, agentId)) {
+        if (client.Register(hostname, osName, capabilities, token, agentId, &agentConfig)) {
             std::cout << "[Agent] Registered with Core. Token acquired." << std::endl;
+            if (!agentConfig.nodeMode.empty()) {
+                std::cout << "[Agent] Config: snapshot=" << (agentConfig.enableSnapshot ? "on" : "off")
+                          << ", ebpf=" << (agentConfig.enableEbpf ? "on" : "off")
+                          << ", node_mode=" << agentConfig.nodeMode << std::endl;
+            }
             break;
         }
 

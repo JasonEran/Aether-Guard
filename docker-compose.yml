@@ -16,12 +16,22 @@ services:
       RabbitMq__Port: "5672"
       Security__CommandApiKey: "${COMMAND_API_KEY}"
       ArtifactBaseUrl: "http://core-service:8080"
+      SnapshotStorage__Provider: "S3"
+      SnapshotStorage__S3__Bucket: "aether-guard-snapshots"
+      SnapshotStorage__S3__Region: "us-east-1"
+      SnapshotStorage__S3__Endpoint: "http://minio:9000"
+      SnapshotStorage__S3__AccessKey: "minioadmin"
+      SnapshotStorage__S3__SecretKey: "minioadmin"
+      SnapshotStorage__S3__UsePathStyle: "true"
+      SnapshotStorage__S3__Prefix: "snapshots"
     depends_on:
       rabbitmq:
         condition: service_healthy
       redis:
         condition: service_healthy
       db:
+        condition: service_started
+      minio:
         condition: service_started
     restart: always
     networks:
@@ -119,9 +129,25 @@ services:
     networks:
       - aether-net
 
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: "minioadmin"
+      MINIO_ROOT_PASSWORD: "minioadmin"
+    command: ["server", "/data", "--console-address", ":9001"]
+    volumes:
+      - minio_data:/data
+    restart: always
+    networks:
+      - aether-net
+
 volumes:
   postgres_data:
   agent_tmp:
+  minio_data:
 
 networks:
   aether-net:

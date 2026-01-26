@@ -61,6 +61,28 @@ def resolve_storage_root() -> Path:
     return appsettings.parent / storage
 
 
+def resolve_storage_mode() -> str:
+    env_provider = os.getenv("AG_STORAGE_PROVIDER")
+    if env_provider:
+        return env_provider.strip().lower()
+
+    appsettings = ROOT / "src/services/core-dotnet/AetherGuard.Core/appsettings.json"
+    if not appsettings.exists():
+        return "local"
+
+    settings = json.loads(appsettings.read_text(encoding="utf-8"))
+    snapshot_storage = settings.get("SnapshotStorage", {})
+    provider = snapshot_storage.get("Provider", "")
+    if provider:
+        return str(provider).strip().lower()
+
+    s3_bucket = snapshot_storage.get("S3", {}).get("Bucket", "")
+    if s3_bucket:
+        return "s3"
+
+    return "local"
+
+
 def md5_digest(data: bytes) -> str:
     return hashlib.md5(data).hexdigest()
 
@@ -117,25 +139,27 @@ def main() -> int:
     headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
     request_bytes("POST", upload_url, body=body, headers=headers)
 
-    storage_root = resolve_storage_root()
-    workload_dir = storage_root / workload_id
-    if not workload_dir.exists():
-        print("Upload verification failed: workload directory not found.")
-        return 1
+    storage_mode = resolve_storage_mode()
+    if storage_mode != "s3":
+        storage_root = resolve_storage_root()
+        workload_dir = storage_root / workload_id
+        if not workload_dir.exists():
+            print("Upload verification failed: workload directory not found.")
+            return 1
 
-    stored_files = sorted(
-        workload_dir.glob("*.tar.gz"),
-        key=lambda path: path.stat().st_mtime,
-        reverse=True,
-    )
-    if not stored_files:
-        print("Upload verification failed: snapshot file not found.")
-        return 1
+        stored_files = sorted(
+            workload_dir.glob("*.tar.gz"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+        if not stored_files:
+            print("Upload verification failed: snapshot file not found.")
+            return 1
 
-    stored_file = stored_files[0]
-    if stored_file.stat().st_size != len(original_bytes):
-        print("Upload verification failed: stored file size mismatch.")
-        return 1
+        stored_file = stored_files[0]
+        if stored_file.stat().st_size != len(original_bytes):
+            print("Upload verification failed: stored file size mismatch.")
+            return 1
 
     download_url = f"{base_url}/download/{quote(workload_id)}"
     downloaded_bytes = request_bytes("GET", download_url)

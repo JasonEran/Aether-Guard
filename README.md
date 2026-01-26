@@ -51,9 +51,10 @@ This project targets a product-grade release, not a demo. The following standard
 - Agent (C++): REST/JSON telemetry; CRIU checkpointing with automatic simulation fallback.
 - Core API (.NET 8): REST controllers plus gRPC services with JSON transcoding; RabbitMQ ingestion worker with W3C trace context propagation; migration orchestration; PostgreSQL storage.
 - Protobuf contracts: shared schemas in src/shared/protos (AgentService + ControlPlane).
+- Agent handshake: registration accepts capability payloads and returns AgentConfig to drive feature gating.
 - AI Engine (FastAPI): volatility and trend rules; Core currently sends empty spotPriceHistory (see Risk Logic).
 - Dashboard (Next.js): telemetry and command visibility with NextAuth credentials.
-- Storage: snapshots stored on local filesystem (Docker volume in compose).
+- Storage: snapshots stored on local filesystem by default; optional S3/MinIO backend via SnapshotStorage settings.
 - Security: API key for command endpoints; no mTLS, OpenTelemetry, or schema registry yet.
 
 ### Productization Gaps (v1.x)
@@ -62,7 +63,7 @@ This project targets a product-grade release, not a demo. The following standard
 - No end-to-end auth on telemetry or artifacts; no mTLS.
 - No OpenTelemetry instrumentation yet (trace context is propagated across RabbitMQ, but spans/metrics/logs are not fully wired).
 - No schema registry or compatibility policy for MQ events.
-- No object storage or retention policy for snapshots.
+- No retention policy or lifecycle automation for snapshots (S3/MinIO backend supported).
 
 ## v2.2 Reference Architecture
 
@@ -114,14 +115,14 @@ This project targets a product-grade release, not a demo. The following standard
 
 ### Phase 2: The Handshake
 
-- [ ] Add DetectCapabilities() in the Agent boot sequence.
-- [ ] Extend /register to accept Capabilities and return AgentConfig.
+- [x] Add DetectCapabilities() in the Agent boot sequence.
+- [x] Extend /register to accept Capabilities and return AgentConfig.
 - [ ] Introduce SPIRE or cert-manager based certificate rotation.
 
 ### Phase 3: The Persistence
 
-- [ ] Deploy MinIO (S3 compatible) for snapshots.
-- [ ] Update ArtifactController to stream to S3 SDK.
+- [x] Deploy MinIO (S3 compatible) for snapshots.
+- [x] Update ArtifactController to stream to S3 SDK.
 - [ ] Add SLSA provenance generation in CI.
 
 ## Architecture (Current Data Flow)
@@ -137,6 +138,7 @@ This project targets a product-grade release, not a demo. The following standard
 - db: PostgreSQL for persistence.
 - rabbitmq: message broker for telemetry ingestion.
 - redis: dedup cache for telemetry ingestion.
+- minio: S3-compatible object storage for snapshot artifacts (enabled in docker-compose).
 
 ## Ports
 
@@ -145,6 +147,8 @@ This project targets a product-grade release, not a demo. The following standard
 - AI Engine: http://localhost:8000
 - PostgreSQL: localhost:5432
 - RabbitMQ Management: http://localhost:15672
+- MinIO API: http://localhost:9000
+- MinIO Console: http://localhost:9001
 
 ## Quick Start (Docker)
 
@@ -190,6 +194,9 @@ These scripts validate demo flows and can be reused as product readiness checks:
 - `verify_phase2.py`
 - `verify_phase3.py`
 
+If snapshot storage is set to S3/MinIO, run `AG_STORAGE_PROVIDER=s3 python verify_phase3.py`
+to skip the local filesystem assertion.
+
 ### Default Login (Development)
 
 - Username: admin
@@ -209,6 +216,19 @@ Core API database connection (docker-compose.yml):
 Core API artifact base URL (docker-compose.yml):
 
 - ArtifactBaseUrl=http://core-service:8080
+
+Snapshot storage (docker-compose.yml):
+
+- SnapshotStorage__Provider=S3
+- SnapshotStorage__S3__Bucket=aether-guard-snapshots
+- SnapshotStorage__S3__Region=us-east-1
+- SnapshotStorage__S3__Endpoint=http://minio:9000
+- SnapshotStorage__S3__AccessKey=minioadmin
+- SnapshotStorage__S3__SecretKey=minioadmin
+- SnapshotStorage__S3__UsePathStyle=true
+- SnapshotStorage__S3__Prefix=snapshots
+
+To keep local filesystem storage, set SnapshotStorage__Provider=Local (or remove the S3 settings).
 
 Dashboard auth (docker-compose.yml):
 
