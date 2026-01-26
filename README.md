@@ -59,7 +59,7 @@ This project targets a product-grade release, not a demo. The following standard
 
 ### Productization Gaps (v1.x)
 
-- No self-check tooling, guided onboarding, or diagnostics bundle.
+- Guided onboarding and diagnostics bundle are still missing (self-check scripts now available).
 - No end-to-end auth on telemetry or artifacts; no mTLS.
 - No OpenTelemetry instrumentation yet (trace context is propagated across RabbitMQ, but spans/metrics/logs are not fully wired).
 - No schema registry or compatibility policy for MQ events.
@@ -101,7 +101,7 @@ This project targets a product-grade release, not a demo. The following standard
 
 ### Phase 0: Product Readiness
 
-- [ ] Add self-check scripts (agent/core dependencies, ports, permissions).
+- [x] Add self-check scripts (agent/core dependencies, ports, permissions).
 - [ ] Add first-run guide in the dashboard.
 - [ ] Add explainability fields and failure reasons in UI.
 - [ ] Add diagnostics bundle export.
@@ -166,11 +166,12 @@ docker compose up -d --scale agent-service=2 agent-service
 
 ### First Run Path (Target <=15 minutes)
 
-1. `docker compose up --build -d`
-2. Open http://localhost:3000 and log in.
-3. Start at least two agents (see command above).
-4. Run the fire drill: `python scripts/fire_drill.py start`
-5. Confirm the dashboard shows risk state changes and migration activity.
+1. `python scripts/self_check.py --target docker`
+2. `docker compose up --build -d`
+3. Open http://localhost:3000 and log in.
+4. Start at least two agents (see command above).
+5. Run the fire drill: `python scripts/fire_drill.py start`
+6. Confirm the dashboard shows risk state changes and migration activity.
 
 ### Fire Drill (Demo Controller)
 
@@ -185,6 +186,22 @@ Reset back to stable:
 ```bash
 python scripts/fire_drill.py stop
 ```
+
+### Self-Check (Prereqs)
+
+Run before first deployment or local development:
+
+```bash
+python scripts/self_check.py --target docker
+```
+
+For local (non-Docker) development:
+
+```bash
+python scripts/self_check.py --target local
+```
+
+Use `--allow-port-in-use` if services are already running.
 
 ### Verification Scripts (Demo)
 
