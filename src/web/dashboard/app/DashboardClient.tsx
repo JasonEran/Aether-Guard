@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { signOut } from 'next-auth/react';
 
 import AuditLogStream from '../components/AuditLogStream';
+import ExplainabilityPanel from '../components/ExplainabilityPanel';
+import FirstRunGuide from '../components/FirstRunGuide';
 import ControlPanel from '../components/ControlPanel';
 import HistoryChart from '../components/HistoryChart';
 import { fetchAuditLogs, fetchFleetStatus, fetchRiskHistory, sendChaosSignal, RiskPoint } from '../lib/api';
@@ -37,6 +39,12 @@ const buildMockPayload = (now: number, chaosActive: boolean) => {
       riskScore: chaosActive ? 0.33 : 0.18,
       lastHeartbeat: new Date(now - 45_000).toISOString(),
       lastCheckpoint: new Date(now - 12 * 60_000).toISOString(),
+      analysisStatus: 'LOW',
+      analysisConfidence: 0.74,
+      predictedCpu: 28,
+      rootCause: 'Stable capacity',
+      rebalanceSignal: false,
+      diskAvailable: 180 * 1024 * 1024 * 1024,
     },
     {
       agentId: 'node-zephyr-07',
@@ -45,6 +53,12 @@ const buildMockPayload = (now: number, chaosActive: boolean) => {
       riskScore: chaosActive ? 0.87 : 0.46,
       lastHeartbeat: new Date(now - 30_000).toISOString(),
       lastCheckpoint: new Date(now - 2 * 60_000).toISOString(),
+      analysisStatus: chaosActive ? 'CRITICAL' : 'LOW',
+      analysisConfidence: chaosActive ? 0.93 : 0.67,
+      predictedCpu: chaosActive ? 92 : 48,
+      rootCause: chaosActive ? 'Rebalance signal asserted' : 'Stable capacity',
+      rebalanceSignal: chaosActive,
+      diskAvailable: chaosActive ? 52 * 1024 * 1024 * 1024 : 96 * 1024 * 1024 * 1024,
     },
     {
       agentId: 'node-sigma-12',
@@ -53,6 +67,12 @@ const buildMockPayload = (now: number, chaosActive: boolean) => {
       riskScore: 0.95,
       lastHeartbeat: new Date(now - 8 * 60_000).toISOString(),
       lastCheckpoint: new Date(now - 30 * 60_000).toISOString(),
+      analysisStatus: 'CRITICAL',
+      analysisConfidence: 0.98,
+      predictedCpu: 98,
+      rootCause: 'Checkpoint restore failed on target node',
+      rebalanceSignal: true,
+      diskAvailable: 12 * 1024 * 1024 * 1024,
     },
   ];
 
@@ -62,6 +82,7 @@ const buildMockPayload = (now: number, chaosActive: boolean) => {
       action: 'Migration Completed',
       agentId: 'node-zephyr-07',
       result: 'Restored on node-atlas-01',
+      error: '',
       timestamp: new Date(now - 90_000).toISOString(),
     },
     {
@@ -69,6 +90,7 @@ const buildMockPayload = (now: number, chaosActive: boolean) => {
       action: 'Checkpoint Created',
       agentId: 'node-zephyr-07',
       result: 'Snapshot stored in relay vault',
+      error: '',
       timestamp: new Date(now - 2 * 60_000).toISOString(),
     },
     {
@@ -76,6 +98,7 @@ const buildMockPayload = (now: number, chaosActive: boolean) => {
       action: 'Risk Scan Updated',
       agentId: 'node-sigma-12',
       result: 'Priority raised to CRITICAL',
+      error: 'Snapshot restore error: filesystem mismatch',
       timestamp: new Date(now - 4 * 60_000).toISOString(),
     },
   ];
@@ -86,6 +109,7 @@ const buildMockPayload = (now: number, chaosActive: boolean) => {
       action: 'Rebalance Signal Injected',
       agentId: 'control-plane',
       result: 'Chaos simulation engaged',
+      error: '',
       timestamp: new Date(now - 25_000).toISOString(),
     });
   }
@@ -112,6 +136,7 @@ export default function DashboardClient({ userName, userRole }: DashboardClientP
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [usingMock, setUsingMock] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [showFirstRunGuide, setShowFirstRunGuide] = useState(true);
   const mockChaosAtRef = useRef<number | null>(null);
 
   const summary = useMemo(() => {
@@ -209,7 +234,17 @@ export default function DashboardClient({ userName, userRole }: DashboardClientP
     setAgents((prev) =>
       prev.map((agent) =>
         agent.tier === 'T2'
-          ? { ...agent, status: 'MIGRATING', riskScore: 0.92, lastHeartbeat: timestamp }
+          ? {
+              ...agent,
+              status: 'MIGRATING',
+              riskScore: 0.92,
+              lastHeartbeat: timestamp,
+              analysisStatus: 'CRITICAL',
+              analysisConfidence: 0.92,
+              predictedCpu: 90,
+              rootCause: 'Rebalance signal asserted',
+              rebalanceSignal: true,
+            }
           : agent,
       ),
     );
@@ -228,11 +263,18 @@ export default function DashboardClient({ userName, userRole }: DashboardClientP
         action: 'Rebalance Signal Injected',
         agentId: 'control-plane',
         result: 'Chaos simulation engaged',
+        error: '',
         timestamp,
       },
       ...prev,
     ]);
   };
+
+  const handleDismissGuide = () => {
+    setShowFirstRunGuide(false);
+  };
+
+  const primaryAgent = agents[0];
 
   if (agents.length === 0) {
     return (
@@ -321,10 +363,14 @@ export default function DashboardClient({ userName, userRole }: DashboardClientP
 
         <section className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1.95fr)]">
           <div className="lg:sticky lg:top-8 lg:col-span-1 lg:self-start">
-            <ControlPanel agents={agents} onSimulateChaos={handleSimulateChaos} />
+            <div className="flex flex-col gap-6">
+              {usingMock && showFirstRunGuide && <FirstRunGuide onDismiss={handleDismissGuide} />}
+              <ControlPanel agents={agents} onSimulateChaos={handleSimulateChaos} />
+            </div>
           </div>
 
           <div className="lg:col-span-1 flex flex-col gap-6">
+            <ExplainabilityPanel agent={primaryAgent} usingMock={usingMock} />
             <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-[0_0_40px_rgba(15,23,42,0.6)]">
               <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Risk Trend</div>
               <div className="mt-4">

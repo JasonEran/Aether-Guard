@@ -6,6 +6,12 @@ export interface Agent {
   tier: WorkloadTier;
   riskScore: number;
   lastHeartbeat: string;
+  analysisStatus?: string;
+  analysisConfidence?: number;
+  predictedCpu?: number;
+  rootCause?: string;
+  rebalanceSignal?: boolean;
+  diskAvailable?: number;
 }
 
 export interface AuditLog {
@@ -13,5 +19,6 @@ export interface AuditLog {
   action: string;
   agentId: string;
   result: string;
+  error?: string;
   timestamp: string;
 }

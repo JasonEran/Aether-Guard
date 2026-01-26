@@ -59,7 +59,7 @@ This project targets a product-grade release, not a demo. The following standard
 
 ### Productization Gaps (v1.x)
 
-- Guided onboarding and diagnostics bundle are still missing (self-check scripts now available).
+- Diagnostics bundle is still missing (self-check scripts and guided first-run are now available).
 - No end-to-end auth on telemetry or artifacts; no mTLS.
 - No OpenTelemetry instrumentation yet (trace context is propagated across RabbitMQ, but spans/metrics/logs are not fully wired).
 - No schema registry or compatibility policy for MQ events.
@@ -102,8 +102,8 @@ This project targets a product-grade release, not a demo. The following standard
 ### Phase 0: Product Readiness
 
 - [x] Add self-check scripts (agent/core dependencies, ports, permissions).
-- [ ] Add first-run guide in the dashboard.
-- [ ] Add explainability fields and failure reasons in UI.
+- [x] Add first-run guide in the dashboard.
+- [x] Add explainability fields and failure reasons in UI.
 - [ ] Add diagnostics bundle export.
 - [ ] Expand docs: Quickstart, Troubleshooting, FAQ, upgrade/rollback.
 

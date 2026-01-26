@@ -83,6 +83,7 @@ export async function fetchFleetStatus(): Promise<Agent[]> {
     }
 
     const telemetry = data.telemetry;
+    const analysis = data.analysis;
     const riskScore = normalizeRiskScore(data.analysis?.confidence ?? (telemetry.rebalanceSignal ? 0.92 : 0.28));
     const status = telemetry.rebalanceSignal ? 'MIGRATING' : 'IDLE';
 
@@ -93,6 +94,12 @@ export async function fetchFleetStatus(): Promise<Agent[]> {
         tier: normalizeTier(telemetry.workloadTier),
         riskScore,
         lastHeartbeat: toIsoTimestamp(telemetry.timestamp),
+        analysisStatus: analysis?.status,
+        analysisConfidence: analysis?.confidence,
+        predictedCpu: analysis?.predictedCpu,
+        rootCause: analysis?.rootCause,
+        rebalanceSignal: telemetry.rebalanceSignal,
+        diskAvailable: telemetry.diskAvailable,
       },
     ];
   } catch (error) {
@@ -144,6 +151,7 @@ export async function fetchAuditLogs(): Promise<AuditLog[]> {
       action: record.action,
       agentId: record.actor,
       result: record.result,
+      error: record.error,
       timestamp: record.createdAt,
     }));
   } catch (error) {
