@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using AetherGuard.Core.Data;
@@ -14,6 +15,9 @@ namespace AetherGuard.Core.Services.Messaging;
 public sealed class TelemetryProcessor : BackgroundService
 {
     private const string QueueName = "telemetry_data";
+    private const string TraceParentHeader = "traceparent";
+    private const string TraceStateHeader = "tracestate";
+    private static readonly ActivitySource ActivitySource = new("AetherGuard.Core.Messaging");
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
@@ -77,6 +81,15 @@ public sealed class TelemetryProcessor : BackgroundService
 
             try
             {
+                var parentContext = ExtractTraceContext(ea.BasicProperties?.Headers);
+                using var activity = ActivitySource.StartActivity(
+                    "telemetry.consume",
+                    ActivityKind.Consumer,
+                    parentContext);
+
+                activity?.SetTag("messaging.system", "rabbitmq");
+                activity?.SetTag("messaging.destination", QueueName);
+
                 var body = Encoding.UTF8.GetString(ea.Body.Span);
                 var payload = JsonSerializer.Deserialize<TelemetryPayload>(body, JsonOptions);
 
@@ -135,5 +148,51 @@ public sealed class TelemetryProcessor : BackgroundService
         _channel.Dispose();
         _connection.Dispose();
         base.Dispose();
+    }
+
+    private static ActivityContext ExtractTraceContext(IDictionary<string, object?>? headers)
+    {
+        if (headers is null)
+        {
+            return default;
+        }
+
+        if (!TryGetHeaderValue(headers, TraceParentHeader, out var traceParent))
+        {
+            return default;
+        }
+
+        TryGetHeaderValue(headers, TraceStateHeader, out var traceState);
+
+        return ActivityContext.TryParse(traceParent, traceState, out var context)
+            ? context
+            : default;
+    }
+
+    private static bool TryGetHeaderValue(
+        IDictionary<string, object?> headers,
+        string key,
+        out string value)
+    {
+        value = string.Empty;
+        if (!headers.TryGetValue(key, out var raw) || raw is null)
+        {
+            return false;
+        }
+
+        switch (raw)
+        {
+            case byte[] bytes:
+                value = Encoding.UTF8.GetString(bytes);
+                return true;
+            case ReadOnlyMemory<byte> memory:
+                value = Encoding.UTF8.GetString(memory.Span);
+                return true;
+            case string str:
+                value = str;
+                return true;
+            default:
+                return false;
+        }
     }
 }

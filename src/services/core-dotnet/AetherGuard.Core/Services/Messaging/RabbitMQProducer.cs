@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
@@ -8,6 +9,8 @@ namespace AetherGuard.Core.Services.Messaging;
 public sealed class RabbitMQProducer : IMessageProducer, IDisposable
 {
     private const string QueueName = "telemetry_data";
+    private const string TraceParentHeader = "traceparent";
+    private const string TraceStateHeader = "tracestate";
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -66,6 +69,8 @@ public sealed class RabbitMQProducer : IMessageProducer, IDisposable
             Persistent = true
         };
 
+        InjectTraceContext(properties);
+
         lock (_lock)
         {
             _channel.BasicPublishAsync(
@@ -76,6 +81,30 @@ public sealed class RabbitMQProducer : IMessageProducer, IDisposable
                 body: body,
                 cancellationToken: CancellationToken.None).GetAwaiter().GetResult();
         }
+    }
+
+    private static void InjectTraceContext(IBasicProperties properties)
+    {
+        var current = Activity.Current;
+        if (current is null)
+        {
+            return;
+        }
+
+        properties.Headers ??= new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        var traceParent = BuildTraceParent(current.Context);
+        properties.Headers[TraceParentHeader] = Encoding.UTF8.GetBytes(traceParent);
+
+        if (!string.IsNullOrWhiteSpace(current.TraceStateString))
+        {
+            properties.Headers[TraceStateHeader] = Encoding.UTF8.GetBytes(current.TraceStateString);
+        }
+    }
+
+    private static string BuildTraceParent(ActivityContext context)
+    {
+        var flags = context.TraceFlags.HasFlag(ActivityTraceFlags.Recorded) ? "01" : "00";
+        return $"00-{context.TraceId.ToHexString()}-{context.SpanId.ToHexString()}-{flags}";
     }
 
     public void Dispose()

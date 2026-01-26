@@ -49,7 +49,8 @@ This project targets a product-grade release, not a demo. The following standard
 ## Current Implementation Snapshot (v1.x)
 
 - Agent (C++): REST/JSON telemetry; CRIU checkpointing with automatic simulation fallback.
-- Core API (.NET 8): REST controllers, RabbitMQ ingestion worker, migration orchestration, PostgreSQL storage.
+- Core API (.NET 8): REST controllers plus gRPC services with JSON transcoding; RabbitMQ ingestion worker with W3C trace context propagation; migration orchestration; PostgreSQL storage.
+- Protobuf contracts: shared schemas in src/shared/protos (AgentService + ControlPlane).
 - AI Engine (FastAPI): volatility and trend rules; Core currently sends empty spotPriceHistory (see Risk Logic).
 - Dashboard (Next.js): telemetry and command visibility with NextAuth credentials.
 - Storage: snapshots stored on local filesystem (Docker volume in compose).
@@ -59,7 +60,7 @@ This project targets a product-grade release, not a demo. The following standard
 
 - No self-check tooling, guided onboarding, or diagnostics bundle.
 - No end-to-end auth on telemetry or artifacts; no mTLS.
-- No OpenTelemetry tracing or standardized structured logging.
+- No OpenTelemetry instrumentation yet (trace context is propagated across RabbitMQ, but spans/metrics/logs are not fully wired).
 - No schema registry or compatibility policy for MQ events.
 - No object storage or retention policy for snapshots.
 
@@ -107,9 +108,9 @@ This project targets a product-grade release, not a demo. The following standard
 
 ### Phase 1: The Contract
 
-- [ ] Enable gRPC JSON transcoding in Core.
-- [ ] Define Protobuf contracts for Agent/Core APIs.
-- [ ] Inject W3C trace context into RabbitMQ headers.
+- [x] Enable gRPC JSON transcoding in Core.
+- [x] Define Protobuf contracts for Agent/Core APIs.
+- [x] Inject W3C trace context into RabbitMQ headers.
 
 ### Phase 2: The Handshake
 
@@ -218,7 +219,7 @@ For production, set a strong AUTH_SECRET and use a secret manager.
 
 ## API Overview
 
-Core API:
+Core API (Legacy REST - v1):
 
 - POST /api/v1/ingestion - receive telemetry from agent
 - GET /api/v1/dashboard/latest - latest telemetry + AI analysis
@@ -226,6 +227,17 @@ Core API:
 - POST /api/v1/market/signal - update market signal file
 - POST /api/v1/artifacts/upload/{workloadId} - upload snapshot
 - GET /api/v1/artifacts/download/{workloadId} - download latest snapshot
+
+Core API (gRPC + JSON Transcoding - v2):
+
+- POST /api/v2/agent/register
+- POST /api/v2/agent/heartbeat
+- GET /api/v2/agent/poll
+- POST /api/v2/agent/feedback
+- POST /api/v2/ingestion
+- POST /api/v2/commands/queue
+- GET /api/v2/dashboard/latest
+- GET /api/v2/dashboard/history
 
 AI Engine:
 
@@ -305,6 +317,8 @@ cmake -S . -B build
 cmake --build build
 ./build/AetherAgent
 ```
+
+Windows build note: install Visual Studio Build Tools, CMake, Ninja, and NASM, and run the build from a VS Developer Command Prompt.
 
 Note: If CRIU is unavailable (Windows/Docker Desktop), the agent runs in simulation mode and still produces a valid snapshot archive for demo flows.
 
