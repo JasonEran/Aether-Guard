@@ -105,7 +105,7 @@ This project targets a product-grade release, not a demo. The following standard
 - [x] Add first-run guide in the dashboard.
 - [x] Add explainability fields and failure reasons in UI.
 - [x] Add diagnostics bundle export.
-- [ ] Expand docs: Quickstart, Troubleshooting, FAQ, upgrade/rollback.
+- [x] Expand docs: Quickstart, Troubleshooting, FAQ, upgrade/rollback.
 
 ### Phase 1: The Contract
 
@@ -157,6 +157,13 @@ docker compose up --build -d
 ```
 
 Open the dashboard at http://localhost:3000.
+
+### Docs
+
+- Quickstart: docs/Quickstart.md
+- Troubleshooting: docs/Troubleshooting.md
+- FAQ: docs/FAQ.md
+- Upgrade and rollback: docs/Upgrade-Rollback.md
 
 If you want to simulate migrations, start at least two agents:
 
