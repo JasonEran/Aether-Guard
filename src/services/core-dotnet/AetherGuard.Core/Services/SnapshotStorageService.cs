@@ -28,6 +28,14 @@ public sealed class S3Settings
 
 public sealed record SnapshotDownload(Stream Stream, string FileName, IDisposable? Disposable);
 
+public sealed record SnapshotDescriptor(
+    string WorkloadId,
+    string FileName,
+    long SizeBytes,
+    DateTimeOffset LastModifiedUtc,
+    string? LocalPath,
+    string? ObjectKey);
+
 public sealed class SnapshotStorageService
 {
     private const string DefaultLocalPath = "Data/Snapshots";
@@ -82,6 +90,7 @@ public sealed class SnapshotStorageService
     }
 
     public bool UsesS3 => _s3Client is not null;
+    public string LocalStorageRoot => ResolveLocalStorageRoot();
 
     public async Task<string?> StoreSnapshotAsync(
         string workloadId,
@@ -175,6 +184,146 @@ public sealed class SnapshotStorageService
             useAsync: true);
 
         return new SnapshotDownload(stream, latestFile.Name, null);
+    }
+
+    public async Task<SnapshotDownload?> OpenSnapshotAsync(
+        SnapshotDescriptor snapshot,
+        CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(snapshot.LocalPath))
+        {
+            if (!File.Exists(snapshot.LocalPath))
+            {
+                return null;
+            }
+
+            var stream = new FileStream(
+                snapshot.LocalPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                81920,
+                useAsync: true);
+            return new SnapshotDownload(stream, snapshot.FileName, null);
+        }
+
+        if (UsesS3 && !string.IsNullOrWhiteSpace(snapshot.ObjectKey))
+        {
+            var response = await _s3Client!.GetObjectAsync(
+                _settings.S3.Bucket,
+                snapshot.ObjectKey,
+                cancellationToken);
+            return new SnapshotDownload(
+                response.ResponseStream,
+                Path.GetFileName(snapshot.ObjectKey),
+                response);
+        }
+
+        return null;
+    }
+
+    public async Task<IReadOnlyList<SnapshotDescriptor>> ListSnapshotsAsync(
+        int maxEntries,
+        CancellationToken cancellationToken)
+    {
+        if (maxEntries <= 0)
+        {
+            return [];
+        }
+
+        var clampedMax = Math.Clamp(maxEntries, 1, 200);
+        var snapshots = new List<SnapshotDescriptor>();
+
+        if (UsesS3)
+        {
+            var prefix = _settings.S3.Prefix.Trim('/');
+            var basePrefix = string.IsNullOrEmpty(prefix) ? string.Empty : $"{prefix}/";
+            var request = new ListObjectsV2Request
+            {
+                BucketName = _settings.S3.Bucket,
+                Prefix = basePrefix
+            };
+
+            ListObjectsV2Response response;
+            do
+            {
+                response = await _s3Client!.ListObjectsV2Async(request, cancellationToken);
+                foreach (var item in response.S3Objects)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (!item.Key.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var trimmedKey = item.Key;
+                    if (!string.IsNullOrEmpty(basePrefix)
+                        && trimmedKey.StartsWith(basePrefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        trimmedKey = trimmedKey[basePrefix.Length..];
+                    }
+
+                    var parts = trimmedKey.Split('/', 2, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length < 2)
+                    {
+                        continue;
+                    }
+
+                    var workloadId = parts[0];
+                    var fileName = Path.GetFileName(parts[1]);
+                    snapshots.Add(new SnapshotDescriptor(
+                        workloadId,
+                        fileName,
+                        item.Size,
+                        new DateTimeOffset(item.LastModified),
+                        null,
+                        item.Key));
+                }
+
+                if (snapshots.Count > clampedMax * 2)
+                {
+                    snapshots = snapshots
+                        .OrderByDescending(item => item.LastModifiedUtc)
+                        .Take(clampedMax)
+                        .ToList();
+                }
+
+                request.ContinuationToken = response.NextContinuationToken;
+            } while (response.IsTruncated);
+
+            return snapshots
+                .OrderByDescending(item => item.LastModifiedUtc)
+                .Take(clampedMax)
+                .ToList();
+        }
+
+        var storageRoot = ResolveLocalStorageRoot();
+        if (!Directory.Exists(storageRoot))
+        {
+            return [];
+        }
+
+        var rootDir = new DirectoryInfo(storageRoot);
+        foreach (var workloadDir in rootDir.EnumerateDirectories())
+        {
+            foreach (var file in workloadDir.EnumerateFiles("*.tar.gz"))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                snapshots.Add(new SnapshotDescriptor(
+                    workloadDir.Name,
+                    file.Name,
+                    file.Length,
+                    new DateTimeOffset(file.LastWriteTimeUtc),
+                    file.FullName,
+                    null));
+            }
+        }
+
+        return snapshots
+            .OrderByDescending(item => item.LastModifiedUtc)
+            .Take(clampedMax)
+            .ToList();
     }
 
     public async Task<bool> HasSnapshotAsync(string workloadId, CancellationToken cancellationToken)

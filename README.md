@@ -59,7 +59,7 @@ This project targets a product-grade release, not a demo. The following standard
 
 ### Productization Gaps (v1.x)
 
-- Diagnostics bundle is still missing (self-check scripts and guided first-run are now available).
+- Diagnostics bundle export is API-only (dashboard workflow is pending).
 - No end-to-end auth on telemetry or artifacts; no mTLS.
 - No OpenTelemetry instrumentation yet (trace context is propagated across RabbitMQ, but spans/metrics/logs are not fully wired).
 - No schema registry or compatibility policy for MQ events.
@@ -104,7 +104,7 @@ This project targets a product-grade release, not a demo. The following standard
 - [x] Add self-check scripts (agent/core dependencies, ports, permissions).
 - [x] Add first-run guide in the dashboard.
 - [x] Add explainability fields and failure reasons in UI.
-- [ ] Add diagnostics bundle export.
+- [x] Add diagnostics bundle export.
 - [ ] Expand docs: Quickstart, Troubleshooting, FAQ, upgrade/rollback.
 
 ### Phase 1: The Contract
@@ -203,6 +203,18 @@ python scripts/self_check.py --target local
 
 Use `--allow-port-in-use` if services are already running.
 
+### Diagnostics Bundle
+
+Export a support bundle (config redacted, recent telemetry/audits, snapshot manifest, optional snapshots):
+
+```bash
+curl -H "X-API-Key: $COMMAND_API_KEY" \
+  "http://localhost:5000/api/v1/diagnostics/bundle?includeSnapshots=true" \
+  --output aetherguard-diagnostics.zip
+```
+
+Tune snapshot limits with `maxSnapshots`, `maxSnapshotBytes`, and `maxTotalSnapshotBytes`.
+
 ### Verification Scripts (Demo)
 
 These scripts validate demo flows and can be reused as product readiness checks:
@@ -264,6 +276,7 @@ Core API (Legacy REST - v1):
 - POST /api/v1/market/signal - update market signal file
 - POST /api/v1/artifacts/upload/{workloadId} - upload snapshot
 - GET /api/v1/artifacts/download/{workloadId} - download latest snapshot
+- GET /api/v1/diagnostics/bundle - export diagnostics bundle (requires X-API-Key)
 
 Core API (gRPC + JSON Transcoding - v2):
 
