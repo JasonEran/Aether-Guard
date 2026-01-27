@@ -1,0 +1,46 @@
+name: SLSA Provenance (Source)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      hashes: ${{ steps.hash.outputs.hashes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create source archive
+        run: git archive --format=tar.gz --output aether-guard-source.tar.gz HEAD
+
+      - name: Generate subject hashes
+        id: hash
+        run: |
+          echo "hashes=$(sha256sum aether-guard-source.tar.gz | base64 -w0)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: aether-guard-source
+          path: aether-guard-source.tar.gz
+
+  provenance:
+    needs: build
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.10.0
+    with:
+      base64-subjects: ${{ needs.build.outputs.hashes }}
+      provenance-name: aether-guard-source.intoto.jsonl

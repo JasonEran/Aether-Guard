@@ -123,7 +123,7 @@ This project targets a product-grade release, not a demo. The following standard
 
 - [x] Deploy MinIO (S3 compatible) for snapshots.
 - [x] Update ArtifactController to stream to S3 SDK.
-- [ ] Add SLSA provenance generation in CI.
+- [x] Add SLSA provenance generation in CI.
 
 ## Architecture (Current Data Flow)
 
