@@ -365,7 +365,7 @@ export default function DashboardClient({ userName, userRole }: DashboardClientP
           <div className="lg:sticky lg:top-8 lg:col-span-1 lg:self-start">
             <div className="flex flex-col gap-6">
               {usingMock && showFirstRunGuide && <FirstRunGuide onDismiss={handleDismissGuide} />}
-              <ControlPanel agents={agents} onSimulateChaos={handleSimulateChaos} />
+              <ControlPanel agents={agents} onSimulateChaos={handleSimulateChaos} userRole={userRole} />
             </div>
           </div>
 

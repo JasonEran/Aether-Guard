@@ -59,7 +59,7 @@ This project targets a product-grade release, not a demo. The following standard
 
 ### Productization Gaps (v1.x)
 
-- Diagnostics bundle export is API-only (dashboard workflow is pending).
+- Diagnostics bundle export available (API + dashboard).
 - No end-to-end auth on telemetry or artifacts; no mTLS.
 - No OpenTelemetry instrumentation yet (trace context is propagated across RabbitMQ, but spans/metrics/logs are not fully wired).
 - No schema registry or compatibility policy for MQ events.
@@ -214,6 +214,7 @@ curl -H "X-API-Key: $COMMAND_API_KEY" \
 ```
 
 Tune snapshot limits with `maxSnapshots`, `maxSnapshotBytes`, and `maxTotalSnapshotBytes`.
+Admins can also export a bundle from the dashboard Control Panel.
 
 ### Verification Scripts (Demo)
 
