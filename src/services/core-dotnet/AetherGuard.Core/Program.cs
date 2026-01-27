@@ -1,10 +1,40 @@
 using AetherGuard.Core.Data;
+using AetherGuard.Core.Security;
 using AetherGuard.Core.Services;
 using AetherGuard.Core.Services.Messaging;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Server.Kestrel.Https;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var mtlsOptions = builder.Configuration.GetSection("Security:Mtls").Get<MtlsOptions>() ?? new MtlsOptions();
+if (mtlsOptions.Enabled)
+{
+    if (string.IsNullOrWhiteSpace(mtlsOptions.CertificatePath)
+        || string.IsNullOrWhiteSpace(mtlsOptions.KeyPath)
+        || string.IsNullOrWhiteSpace(mtlsOptions.BundlePath))
+    {
+        throw new InvalidOperationException("mTLS is enabled but certificate paths are not configured.");
+    }
+
+    builder.WebHost.ConfigureKestrel(options =>
+    {
+        options.ListenAnyIP(mtlsOptions.Port, listenOptions =>
+        {
+            listenOptions.UseHttps(httpsOptions =>
+            {
+                httpsOptions.ClientCertificateMode = mtlsOptions.RequireClientCertificate
+                    ? ClientCertificateMode.RequireCertificate
+                    : ClientCertificateMode.AllowCertificate;
+                httpsOptions.ServerCertificateSelector = (_, _) =>
+                    MtlsCertificateLoader.LoadServerCertificate(mtlsOptions);
+                httpsOptions.ClientCertificateValidation = (cert, _, _) =>
+                    MtlsCertificateLoader.ValidateClientCertificate(cert, mtlsOptions);
+            });
+        });
+    });
+}
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -58,7 +88,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+if (!mtlsOptions.Enabled || !mtlsOptions.DisableHttpsRedirection)
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseCors("AllowDashboard");
 app.UseAuthorization();

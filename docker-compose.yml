@@ -4,8 +4,10 @@ services:
       context: ./src/services/core-dotnet/AetherGuard.Core
     ports:
       - "5000:8080"
+      - "5001:8443"
     volumes:
       - ./src/services/core-dotnet/AetherGuard.Core/Data:/app/Data
+      - core_spiffe:/run/spiffe/certs
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DefaultConnection: "Host=db;Database=AetherGuardDb;Username=postgres;Password=password"
@@ -15,7 +17,15 @@ services:
       RabbitMq__Password: "secure_password"
       RabbitMq__Port: "5672"
       Security__CommandApiKey: "${COMMAND_API_KEY}"
-      ArtifactBaseUrl: "http://core-service:8080"
+      ArtifactBaseUrl: "https://core-service:8443"
+      Security__Mtls__Enabled: "true"
+      Security__Mtls__Port: "8443"
+      Security__Mtls__CertificatePath: "/run/spiffe/certs/svid.pem"
+      Security__Mtls__KeyPath: "/run/spiffe/certs/svid_key.pem"
+      Security__Mtls__BundlePath: "/run/spiffe/certs/bundle.pem"
+      Security__Mtls__AllowedClientSpiffeIds__0: "spiffe://aether-guard.local/agent-service"
+      Security__Mtls__RequireClientCertificate: "true"
+      Security__Mtls__DisableHttpsRedirection: "true"
       SnapshotStorage__Provider: "S3"
       SnapshotStorage__S3__Bucket: "aether-guard-snapshots"
       SnapshotStorage__S3__Region: "us-east-1"
@@ -33,6 +43,8 @@ services:
         condition: service_started
       minio:
         condition: service_started
+      spiffe-helper-core:
+        condition: service_started
     restart: always
     networks:
       - aether-net
@@ -48,8 +60,17 @@ services:
       - apparmor:unconfined
     volumes:
       - agent_tmp:/tmp
+      - agent_spiffe:/run/spiffe/certs
+    environment:
+      AG_CORE_URL: "https://core-service:8443"
+      AG_MTLS_ENABLED: "true"
+      AG_MTLS_CERT_PATH: "/run/spiffe/certs/svid.pem"
+      AG_MTLS_KEY_PATH: "/run/spiffe/certs/svid_key.pem"
+      AG_MTLS_CA_PATH: "/run/spiffe/certs/bundle.pem"
+      AG_MTLS_VERIFY_HOST: "false"
     depends_on:
       - core-service
+      - spiffe-helper-agent
     restart: always
     networks:
       - aether-net
@@ -129,6 +150,81 @@ services:
     networks:
       - aether-net
 
+  spire-server:
+    image: ghcr.io/spiffe/spire-server:1.8.2
+    command: ["-config", "/etc/spire/server/server.conf"]
+    volumes:
+      - ./infrastructure/spire/server.conf:/etc/spire/server/server.conf:ro
+      - spire_server_data:/run/spire/data
+      - spire_server_socket:/run/spire/sockets
+    restart: always
+    networks:
+      - aether-net
+
+  spire-bootstrap:
+    build:
+      context: ./infrastructure/spire
+      dockerfile: Dockerfile.bootstrap
+    environment:
+      SPIRE_TRUST_DOMAIN: "aether-guard.local"
+    volumes:
+      - spire_server_socket:/run/spire/sockets
+      - spire_bootstrap:/run/spire/bootstrap
+    depends_on:
+      spire-server:
+        condition: service_started
+    restart: "no"
+    networks:
+      - aether-net
+
+  spire-agent:
+    image: ghcr.io/spiffe/spire-agent:1.8.2
+    command: ["-config", "/etc/spire/agent/agent.conf"]
+    volumes:
+      - ./infrastructure/spire/agent.conf:/etc/spire/agent/agent.conf:ro
+      - spire_agent_data:/run/spire/data
+      - spire_agent_socket:/run/spire/sockets
+      - spire_bootstrap:/run/spire/bootstrap
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      spire-bootstrap:
+        condition: service_completed_successfully
+    restart: always
+    networks:
+      - aether-net
+
+  spiffe-helper-core:
+    image: ghcr.io/spiffe/spiffe-helper:0.8.4
+    command: ["-config", "/run/spiffe/helper.conf"]
+    labels:
+      aether-guard.service: "core"
+    volumes:
+      - ./infrastructure/spire/spiffe-helper-core.conf:/run/spiffe/helper.conf:ro
+      - spire_agent_socket:/run/spire/sockets
+      - core_spiffe:/run/spiffe/certs
+    depends_on:
+      spire-agent:
+        condition: service_started
+    restart: always
+    networks:
+      - aether-net
+
+  spiffe-helper-agent:
+    image: ghcr.io/spiffe/spiffe-helper:0.8.4
+    command: ["-config", "/run/spiffe/helper.conf"]
+    labels:
+      aether-guard.service: "agent"
+    volumes:
+      - ./infrastructure/spire/spiffe-helper-agent.conf:/run/spiffe/helper.conf:ro
+      - spire_agent_socket:/run/spire/sockets
+      - agent_spiffe:/run/spiffe/certs
+    depends_on:
+      spire-agent:
+        condition: service_started
+    restart: always
+    networks:
+      - aether-net
+
   minio:
     image: minio/minio:latest
     ports:
@@ -148,6 +244,13 @@ volumes:
   postgres_data:
   agent_tmp:
   minio_data:
+  spire_server_data:
+  spire_agent_data:
+  spire_server_socket:
+  spire_agent_socket:
+  spire_bootstrap:
+  core_spiffe:
+  agent_spiffe:
 
 networks:
   aether-net:

@@ -43,9 +43,18 @@ struct AgentConfig {
     std::string nodeMode;
 };
 
+struct TlsSettings {
+    bool enabled = false;
+    std::string certPath;
+    std::string keyPath;
+    std::string caPath;
+    bool verifyPeer = true;
+    bool verifyHost = false;
+};
+
 class NetworkClient {
 public:
-    explicit NetworkClient(std::string baseUrl);
+    explicit NetworkClient(std::string baseUrl, TlsSettings tlsSettings = {});
 
     bool Register(
         const std::string& hostname,
@@ -67,4 +76,5 @@ public:
 
 private:
     std::string baseUrl_;
+    TlsSettings tlsSettings_;
 };

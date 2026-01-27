@@ -117,7 +117,7 @@ This project targets a product-grade release, not a demo. The following standard
 
 - [x] Add DetectCapabilities() in the Agent boot sequence.
 - [x] Extend /register to accept Capabilities and return AgentConfig.
-- [ ] Introduce SPIRE or cert-manager based certificate rotation.
+- [x] Introduce SPIRE or cert-manager based certificate rotation.
 
 ### Phase 3: The Persistence
 
@@ -143,6 +143,7 @@ This project targets a product-grade release, not a demo. The following standard
 ## Ports
 
 - Core API: http://localhost:5000
+- Core API (mTLS): https://localhost:5001
 - Dashboard: http://localhost:3000
 - AI Engine: http://localhost:8000
 - PostgreSQL: localhost:5432
@@ -164,6 +165,7 @@ Open the dashboard at http://localhost:3000.
 - Troubleshooting: docs/Troubleshooting.md
 - FAQ: docs/FAQ.md
 - Upgrade and rollback: docs/Upgrade-Rollback.md
+- SPIRE mTLS: docs/SPIRE-mTLS.md
 
 If you want to simulate migrations, start at least two agents:
 
@@ -252,7 +254,7 @@ Core API database connection (docker-compose.yml):
 
 Core API artifact base URL (docker-compose.yml):
 
-- ArtifactBaseUrl=http://core-service:8080
+- ArtifactBaseUrl=https://core-service:8443
 
 Snapshot storage (docker-compose.yml):
 
@@ -273,6 +275,20 @@ Dashboard auth (docker-compose.yml):
 - AUTH_TRUST_HOST=true
 
 For production, set a strong AUTH_SECRET and use a secret manager.
+
+### SPIRE mTLS (Docker Compose)
+
+The default docker-compose stack now provisions SPIRE (server + agent) plus spiffe-helper
+sidecars to issue and rotate X.509 SVIDs:
+
+- Core serves mTLS on `https://core-service:8443` (host-mapped to 5001).
+- Agent uses SPIFFE-issued certs from `/run/spiffe/certs` and calls the mTLS endpoint.
+- HTTP on `http://core-service:8080` remains for dashboard/AI traffic.
+
+Disable mTLS locally by setting:
+
+- `Security__Mtls__Enabled=false` (core-service)
+- `AG_MTLS_ENABLED=false` and `AG_CORE_URL=http://core-service:8080` (agent-service)
 
 ## API Overview
 

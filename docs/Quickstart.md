@@ -5,7 +5,7 @@ This guide gets you from zero to live telemetry in under 15 minutes.
 ## Prerequisites
 
 - Docker Desktop (or Docker Engine) with Docker Compose v2
-- Ports available: 3000, 5000, 8000, 5432, 5672, 6379, 9000, 9001, 15672
+- Ports available: 3000, 5000, 5001, 8000, 5432, 5672, 6379, 9000, 9001, 15672
 - Python 3.10+ for helper scripts
 
 Run the self-check before first deployment:
@@ -19,6 +19,8 @@ python scripts/self_check.py --target docker
 ```bash
 docker compose up --build -d
 ```
+
+For SPIRE-based mTLS details, see `docs/SPIRE-mTLS.md`.
 
 Open the dashboard at `http://localhost:3000` and log in with:
 
@@ -64,4 +66,3 @@ curl -H "X-API-Key: $COMMAND_API_KEY" \
 ```
 
 Admins can also export a bundle from the dashboard Control Panel.
-

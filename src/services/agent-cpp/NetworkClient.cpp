@@ -1,6 +1,7 @@
 #include "NetworkClient.hpp"
 
 #include <cpr/cpr.h>
+#include <cpr/ssl_options.h>
 #include <nlohmann/json.hpp>
 
 #include <chrono>
@@ -44,10 +45,20 @@ void LogRetry(int attempt) {
     std::cerr << "[Network] Request failed (Attempt " << (attempt + 1) << "/" << kMaxRetries
               << "). Retrying in " << waitSeconds << "s..." << std::endl;
 }
+
+cpr::SslOptions BuildSslOptions(const TlsSettings& settings) {
+    return cpr::SslOptions{
+        cpr::ssl::CaInfo{settings.caPath},
+        cpr::ssl::CertFile{settings.certPath},
+        cpr::ssl::KeyFile{settings.keyPath},
+        cpr::ssl::VerifyPeer{settings.verifyPeer},
+        cpr::ssl::VerifyHost{settings.verifyHost}
+    };
+}
 } // namespace
 
-NetworkClient::NetworkClient(std::string baseUrl)
-    : baseUrl_(std::move(baseUrl)) {}
+NetworkClient::NetworkClient(std::string baseUrl, TlsSettings tlsSettings)
+    : baseUrl_(std::move(baseUrl)), tlsSettings_(std::move(tlsSettings)) {}
 
 bool NetworkClient::Register(
     const std::string& hostname,
@@ -70,10 +81,16 @@ bool NetworkClient::Register(
         }}
     };
 
-    cpr::Response response = cpr::Post(
-        cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/register")},
-        cpr::Body{payload.dump()},
-        cpr::Header{{"Content-Type", "application/json"}});
+    cpr::Response response = tlsSettings_.enabled
+        ? cpr::Post(
+            cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/register")},
+            cpr::Body{payload.dump()},
+            cpr::Header{{"Content-Type", "application/json"}},
+            BuildSslOptions(tlsSettings_))
+        : cpr::Post(
+            cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/register")},
+            cpr::Body{payload.dump()},
+            cpr::Header{{"Content-Type", "application/json"}});
 
     if (response.error.code != cpr::ErrorCode::OK) {
         std::cerr << "[Agent] register failed: " << response.error.message << std::endl;
@@ -127,12 +144,20 @@ bool NetworkClient::SendHeartbeat(
     }
 
     for (int attempt = 0; attempt < kMaxRetries; ++attempt) {
-        cpr::Response response = cpr::Post(
-            cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/heartbeat")},
-            cpr::Body{payload.dump()},
-            headers,
-            cpr::ConnectTimeout{kConnectTimeout},
-            cpr::Timeout{kTelemetryTimeout});
+        cpr::Response response = tlsSettings_.enabled
+            ? cpr::Post(
+                cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/heartbeat")},
+                cpr::Body{payload.dump()},
+                headers,
+                cpr::ConnectTimeout{kConnectTimeout},
+                cpr::Timeout{kTelemetryTimeout},
+                BuildSslOptions(tlsSettings_))
+            : cpr::Post(
+                cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/heartbeat")},
+                cpr::Body{payload.dump()},
+                headers,
+                cpr::ConnectTimeout{kConnectTimeout},
+                cpr::Timeout{kTelemetryTimeout});
 
         const bool requestOk = response.error.code == cpr::ErrorCode::OK;
         const bool statusOk = IsSuccessStatus(response);
@@ -175,9 +200,14 @@ bool NetworkClient::PollCommands(const std::string& agentId, std::vector<Command
         return false;
     }
 
-    cpr::Response response = cpr::Get(
-        cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/poll")},
-        cpr::Parameters{{"agentId", agentId}});
+    cpr::Response response = tlsSettings_.enabled
+        ? cpr::Get(
+            cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/poll")},
+            cpr::Parameters{{"agentId", agentId}},
+            BuildSslOptions(tlsSettings_))
+        : cpr::Get(
+            cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/poll")},
+            cpr::Parameters{{"agentId", agentId}});
 
     if (response.error.code != cpr::ErrorCode::OK) {
         std::cerr << "[Agent] poll failed: " << response.error.message << std::endl;
@@ -228,10 +258,16 @@ bool NetworkClient::SendFeedback(const std::string& agentId, const CommandFeedba
         {"error", feedback.error}
     };
 
-    cpr::Response response = cpr::Post(
-        cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/feedback")},
-        cpr::Body{payload.dump()},
-        cpr::Header{{"Content-Type", "application/json"}});
+    cpr::Response response = tlsSettings_.enabled
+        ? cpr::Post(
+            cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/feedback")},
+            cpr::Body{payload.dump()},
+            cpr::Header{{"Content-Type", "application/json"}},
+            BuildSslOptions(tlsSettings_))
+        : cpr::Post(
+            cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/feedback")},
+            cpr::Body{payload.dump()},
+            cpr::Header{{"Content-Type", "application/json"}});
 
     if (response.error.code != cpr::ErrorCode::OK) {
         std::cerr << "[Agent] feedback failed: " << response.error.message << std::endl;
@@ -257,11 +293,18 @@ bool NetworkClient::UploadSnapshot(const std::string& url, const std::string& fi
     }
 
     for (int attempt = 0; attempt < kMaxRetries; ++attempt) {
-        cpr::Response response = cpr::Post(
-            cpr::Url{url},
-            cpr::Multipart{{"file", cpr::File{filePath}}},
-            cpr::ConnectTimeout{kConnectTimeout},
-            cpr::LowSpeed{kLowSpeedBytesPerSecond, kLowSpeedTimeoutSeconds});
+        cpr::Response response = tlsSettings_.enabled
+            ? cpr::Post(
+                cpr::Url{url},
+                cpr::Multipart{{"file", cpr::File{filePath}}},
+                cpr::ConnectTimeout{kConnectTimeout},
+                cpr::LowSpeed{kLowSpeedBytesPerSecond, kLowSpeedTimeoutSeconds},
+                BuildSslOptions(tlsSettings_))
+            : cpr::Post(
+                cpr::Url{url},
+                cpr::Multipart{{"file", cpr::File{filePath}}},
+                cpr::ConnectTimeout{kConnectTimeout},
+                cpr::LowSpeed{kLowSpeedBytesPerSecond, kLowSpeedTimeoutSeconds});
 
         const bool requestOk = response.error.code == cpr::ErrorCode::OK;
         const bool statusOk = IsSuccessStatus(response);
@@ -301,7 +344,9 @@ bool NetworkClient::DownloadSnapshot(const std::string& url, const std::string& 
         }
     }
 
-    cpr::Response response = cpr::Get(cpr::Url{url});
+    cpr::Response response = tlsSettings_.enabled
+        ? cpr::Get(cpr::Url{url}, BuildSslOptions(tlsSettings_))
+        : cpr::Get(cpr::Url{url});
 
     if (response.error.code != cpr::ErrorCode::OK) {
         std::cerr << "[Agent] download failed: " << response.error.message << std::endl;

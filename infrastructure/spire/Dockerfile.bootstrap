@@ -1,0 +1,8 @@
+FROM ghcr.io/spiffe/spire-server:1.8.2 AS spire
+
+FROM alpine:3.19
+RUN apk add --no-cache ca-certificates
+COPY --from=spire /opt/spire/bin/spire-server /usr/local/bin/spire-server
+COPY bootstrap.sh /bootstrap.sh
+RUN chmod +x /bootstrap.sh
+ENTRYPOINT ["/bin/sh", "/bootstrap.sh"]
