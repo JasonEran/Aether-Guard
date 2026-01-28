@@ -28,6 +28,27 @@ Fix:
 - Check AI logs: `docker compose logs -f ai-service`
 - Verify core can reach AI: `http://ai-service:8000/analyze` should be reachable inside the network.
 
+### Traces missing in Jaeger
+
+Cause: OpenTelemetry exporters or collector not running.
+
+Fix:
+- Ensure otel-collector and jaeger are healthy: `docker compose ps`
+- Check collector logs: `docker compose logs -f otel-collector`
+- Confirm OTLP ports are reachable: `4317` (gRPC) and `4318` (HTTP).
+
+### SPIRE certs missing or spiffe-helper logs "no identity issued"
+
+Cause: SPIRE agent cannot resolve container IDs from cgroups (common on Docker Desktop
+or cgroup v2) or the agent is not running with host PID visibility.
+
+Fix:
+- Ensure `spire-agent` uses `pid: "host"` in `docker-compose.yml`.
+- Confirm `container_id_cgroup_matchers` includes `/../<id>` for Docker Desktop and
+  `/docker/<id>` for Linux cgroup paths.
+- Restart SPIRE services: `docker compose up -d --force-recreate spire-agent spiffe-helper-core spiffe-helper-agent`
+- Verify certs from the workloads: `docker compose exec core-service ls -la /run/spiffe/certs`
+
 ### Diagnostics export fails (403 or 500)
 
 Cause:
@@ -73,4 +94,3 @@ Fix:
 - Dashboard: `docker compose logs -f web-service`
 
 Use the diagnostics bundle to share logs, telemetry, and config with redaction.
-

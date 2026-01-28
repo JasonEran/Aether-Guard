@@ -55,15 +55,14 @@ This project targets a product-grade release, not a demo. The following standard
 - AI Engine (FastAPI): volatility and trend rules; Core currently sends empty spotPriceHistory (see Risk Logic).
 - Dashboard (Next.js): telemetry and command visibility with NextAuth credentials.
 - Storage: snapshots stored on local filesystem by default; optional S3/MinIO backend via SnapshotStorage settings.
-- Security: API key for command endpoints; no mTLS, OpenTelemetry, or schema registry yet.
+- Security: API key for command endpoints; SPIRE mTLS for agent/core; OpenTelemetry baseline across core/AI/dashboard.
 
 ### Productization Gaps (v1.x)
 
 - Diagnostics bundle export available (API + dashboard).
-- No end-to-end auth on telemetry or artifacts; no mTLS.
-- No OpenTelemetry instrumentation yet (trace context is propagated across RabbitMQ, but spans/metrics/logs are not fully wired).
+- No end-to-end auth on telemetry or artifacts; command API key only.
 - No schema registry or compatibility policy for MQ events.
-- No retention policy or lifecycle automation for snapshots (S3/MinIO backend supported).
+- Agent-side OpenTelemetry spans are not yet emitted (server-side spans/metrics are wired).
 
 ## v2.2 Reference Architecture
 
@@ -125,6 +124,12 @@ This project targets a product-grade release, not a demo. The following standard
 - [x] Update ArtifactController to stream to S3 SDK.
 - [x] Add SLSA provenance generation in CI.
 
+### Phase 4: Observability + Supply Chain
+
+- [x] Add OpenTelemetry collector + Jaeger and wire core/AI/dashboard exporters.
+- [x] Add snapshot retention automation and S3 lifecycle policy support.
+- [x] Generate SBOMs and sign container images with cosign in CI.
+
 ## Architecture (Current Data Flow)
 
 - Agent (C++) -> Core API (.NET) -> AI Engine (FastAPI) -> Core API -> PostgreSQL -> Dashboard (Next.js)
@@ -150,6 +155,9 @@ This project targets a product-grade release, not a demo. The following standard
 - RabbitMQ Management: http://localhost:15672
 - MinIO API: http://localhost:9000
 - MinIO Console: http://localhost:9001
+- OpenTelemetry OTLP gRPC: http://localhost:4317
+- OpenTelemetry OTLP HTTP: http://localhost:4318
+- Jaeger UI: http://localhost:16686
 
 ## Quick Start (Docker)
 
@@ -166,6 +174,7 @@ Open the dashboard at http://localhost:3000.
 - FAQ: docs/FAQ.md
 - Upgrade and rollback: docs/Upgrade-Rollback.md
 - SPIRE mTLS: docs/SPIRE-mTLS.md
+- Observability (OpenTelemetry): docs/Observability.md
 
 If you want to simulate migrations, start at least two agents:
 
@@ -269,6 +278,13 @@ Snapshot storage (docker-compose.yml):
 
 To keep local filesystem storage, set SnapshotStorage__Provider=Local (or remove the S3 settings).
 
+Snapshot retention (core-service):
+
+- SnapshotRetention__MaxAgeDays=14
+- SnapshotRetention__MaxSnapshotsPerWorkload=5
+- SnapshotRetention__MaxTotalSnapshots=500
+- SnapshotRetention__ApplyS3Lifecycle=true
+
 Dashboard auth (docker-compose.yml):
 
 - AUTH_SECRET=super-secret-key
@@ -289,6 +305,16 @@ Disable mTLS locally by setting:
 
 - `Security__Mtls__Enabled=false` (core-service)
 - `AG_MTLS_ENABLED=false` and `AG_CORE_URL=http://core-service:8080` (agent-service)
+
+### OpenTelemetry (Docker Compose)
+
+The default stack includes an OpenTelemetry Collector and Jaeger:
+
+- Collector receives OTLP on `4317` (gRPC) and `4318` (HTTP).
+- Jaeger UI runs on http://localhost:16686.
+
+Core, AI, and Dashboard emit spans and metrics to the collector when enabled via
+environment variables in `docker-compose.yml`.
 
 ## API Overview
 
@@ -401,6 +427,12 @@ Note: If CRIU is unavailable (Windows/Docker Desktop), the agent runs in simulat
 - Authentication uses NextAuth Credentials for the MVP; use an external identity provider for production.
 - CORS is limited to http://localhost:3000 in development.
 - Secrets and credentials must be rotated for any public deployment.
+
+## Supply Chain
+
+The `supply-chain` workflow builds container images, generates SBOMs, signs with cosign, and
+emits SLSA provenance for each image. Artifacts are uploaded to GitHub Actions and images are
+pushed to GHCR under `ghcr.io/<owner>/aether-guard/...`.
 
 ## Contributing
 

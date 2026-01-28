@@ -1,12 +1,20 @@
 using AetherGuard.Core.Data;
+using AetherGuard.Core.Observability;
 using AetherGuard.Core.Security;
 using AetherGuard.Core.Services;
 using AetherGuard.Core.Services.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using StackExchange.Redis;
+using System.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
+
+Activity.DefaultIdFormat = ActivityIdFormat.W3C;
+Activity.ForceDefaultIdFormat = true;
 
 var mtlsOptions = builder.Configuration.GetSection("Security:Mtls").Get<MtlsOptions>() ?? new MtlsOptions();
 if (mtlsOptions.Enabled)
@@ -53,6 +61,51 @@ builder.Services.AddSingleton<SnapshotStorageService>();
 builder.Services.AddSingleton<IMessageProducer, RabbitMQProducer>();
 builder.Services.AddHostedService<TelemetryProcessor>();
 builder.Services.AddHostedService<MigrationCycleService>();
+builder.Services.AddHostedService<SnapshotRetentionService>();
+
+var otelOptions = builder.Configuration.GetSection("OpenTelemetry").Get<OpenTelemetryOptions>()
+    ?? new OpenTelemetryOptions();
+if (otelOptions.Enabled)
+{
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(resourceBuilder =>
+        {
+            resourceBuilder.AddService(
+                serviceName: otelOptions.ServiceName,
+                serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown",
+                serviceInstanceId: Environment.MachineName);
+        })
+        .WithTracing(tracerProviderBuilder =>
+        {
+            tracerProviderBuilder
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddEntityFrameworkCoreInstrumentation()
+                .AddSource("AetherGuard.Core.Messaging")
+                .AddOtlpExporter(options =>
+                {
+                    options.Endpoint = new Uri(otelOptions.OtlpEndpoint);
+                    options.Protocol = otelOptions.Protocol.Equals("http/protobuf", StringComparison.OrdinalIgnoreCase)
+                        ? OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf
+                        : OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
+                });
+        })
+        .WithMetrics(metricProviderBuilder =>
+        {
+            metricProviderBuilder
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddRuntimeInstrumentation()
+                .AddProcessInstrumentation()
+                .AddOtlpExporter(options =>
+                {
+                    options.Endpoint = new Uri(otelOptions.OtlpEndpoint);
+                    options.Protocol = otelOptions.Protocol.Equals("http/protobuf", StringComparison.OrdinalIgnoreCase)
+                        ? OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf
+                        : OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
+                });
+        });
+}
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(connectionString))

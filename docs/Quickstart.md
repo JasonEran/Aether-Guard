@@ -5,7 +5,7 @@ This guide gets you from zero to live telemetry in under 15 minutes.
 ## Prerequisites
 
 - Docker Desktop (or Docker Engine) with Docker Compose v2
-- Ports available: 3000, 5000, 5001, 8000, 5432, 5672, 6379, 9000, 9001, 15672
+- Ports available: 3000, 5000, 5001, 8000, 4317, 4318, 5432, 5672, 6379, 9000, 9001, 15672, 16686
 - Python 3.10+ for helper scripts
 
 Run the self-check before first deployment:
@@ -21,11 +21,14 @@ docker compose up --build -d
 ```
 
 For SPIRE-based mTLS details, see `docs/SPIRE-mTLS.md`.
+For observability setup, see `docs/Observability.md`.
 
 Open the dashboard at `http://localhost:3000` and log in with:
 
 - Username: `admin`
 - Password: `admin123`
+
+Open Jaeger at `http://localhost:16686` to view traces.
 
 If you want to simulate migrations, start at least two agents:
 

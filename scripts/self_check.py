@@ -19,6 +19,8 @@ APPSETTINGS_PATH = CORE_ROOT / "appsettings.json"
 
 PORTS = [
     ("core-api", 5000),
+    ("core-otel-grpc", 4317),
+    ("core-otel-http", 4318),
     ("dashboard", 3000),
     ("ai-engine", 8000),
     ("postgres", 5432),
@@ -27,6 +29,7 @@ PORTS = [
     ("redis", 6379),
     ("minio", 9000),
     ("minio-console", 9001),
+    ("jaeger-ui", 16686),
 ]
 
 STATUS_OK = "OK"

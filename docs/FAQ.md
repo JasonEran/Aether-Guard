@@ -3,7 +3,7 @@
 ## Is this production-ready?
 
 The repo is an MVP plus a v2.2 reference architecture. Some productization gaps remain
-(mTLS, schema registry, SLSA provenance). The checklist in `README.md` tracks progress.
+(end-to-end auth, schema registry). The checklist in `README.md` tracks progress.
 
 ## How do I change the dashboard admin credentials?
 
@@ -30,6 +30,22 @@ Set:
 - `SnapshotStorage__S3__SecretKey=...`
 
 These settings are already wired in `docker-compose.yml` for MinIO.
+
+## How do I change snapshot retention?
+
+Tune `SnapshotRetention` in `src/services/core-dotnet/AetherGuard.Core/appsettings.json` or via
+environment variables:
+
+- `SnapshotRetention__MaxAgeDays`
+- `SnapshotRetention__MaxSnapshotsPerWorkload`
+- `SnapshotRetention__MaxTotalSnapshots`
+
+Set `SnapshotRetention__ApplyS3Lifecycle=true` to apply a bucket lifecycle rule when using S3.
+
+## Where do I view OpenTelemetry traces?
+
+Open Jaeger at http://localhost:16686. The stack exports traces from core, AI, and dashboard to
+the OpenTelemetry collector by default in Docker.
 
 ## Why is AI confidence always low?
 
@@ -58,4 +74,3 @@ curl -H "X-API-Key: $COMMAND_API_KEY" \
 ```
 
 Admins can also export it from the dashboard Control Panel.
-

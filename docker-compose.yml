@@ -1,7 +1,8 @@
 services:
   core-service:
     build:
-      context: ./src/services/core-dotnet/AetherGuard.Core
+      context: .
+      dockerfile: ./src/services/core-dotnet/AetherGuard.Core/Dockerfile
     ports:
       - "5000:8080"
       - "5001:8443"
@@ -26,6 +27,10 @@ services:
       Security__Mtls__AllowedClientSpiffeIds__0: "spiffe://aether-guard.local/agent-service"
       Security__Mtls__RequireClientCertificate: "true"
       Security__Mtls__DisableHttpsRedirection: "true"
+      OpenTelemetry__Enabled: "true"
+      OpenTelemetry__ServiceName: "aether-guard-core"
+      OpenTelemetry__OtlpEndpoint: "http://otel-collector:4317"
+      OpenTelemetry__Protocol: "grpc"
       SnapshotStorage__Provider: "S3"
       SnapshotStorage__S3__Bucket: "aether-guard-snapshots"
       SnapshotStorage__S3__Region: "us-east-1"
@@ -51,7 +56,8 @@ services:
 
   agent-service:
     build:
-      context: ./src/services/agent-cpp
+      context: .
+      dockerfile: ./src/services/agent-cpp/Dockerfile
     privileged: true
     pid: "host"
     ipc: "host"
@@ -82,6 +88,10 @@ services:
       - "8000:8000"
     environment:
       PYTHONUNBUFFERED: "1"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
+      OTEL_SERVICE_NAME: "aether-guard-ai"
+      OTEL_TRACES_EXPORTER: "otlp"
+      OTEL_METRICS_EXPORTER: "otlp"
     volumes:
       - ./src/services/ai-engine/Data:/app/Data
     restart: always
@@ -98,6 +108,10 @@ services:
       AUTH_TRUST_HOST: "true"
       COMMAND_API_KEY: "${COMMAND_API_KEY}"
       CORE_API_URL: "http://core-service:8080"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
+      OTEL_SERVICE_NAME: "aether-guard-dashboard"
+      OTEL_TRACES_EXPORTER: "otlp"
+      OTEL_METRICS_EXPORTER: "otlp"
     depends_on:
       - core-service
     restart: always
@@ -178,7 +192,10 @@ services:
       - aether-net
 
   spire-agent:
-    image: ghcr.io/spiffe/spire-agent:1.8.2
+    build:
+      context: ./infrastructure/spire
+      dockerfile: Dockerfile.agent
+    image: aether-guard-spire-agent
     command: ["-config", "/etc/spire/agent/agent.conf"]
     volumes:
       - ./infrastructure/spire/agent.conf:/etc/spire/agent/agent.conf:ro
@@ -186,6 +203,7 @@ services:
       - spire_agent_socket:/run/spire/sockets
       - spire_bootstrap:/run/spire/bootstrap
       - /var/run/docker.sock:/var/run/docker.sock
+    pid: "host"
     depends_on:
       spire-bootstrap:
         condition: service_completed_successfully
@@ -194,7 +212,7 @@ services:
       - aether-net
 
   spiffe-helper-core:
-    image: ghcr.io/spiffe/spiffe-helper:0.8.4
+    image: ghcr.io/spiffe/spiffe-helper:0.8.0
     command: ["-config", "/run/spiffe/helper.conf"]
     labels:
       aether-guard.service: "core"
@@ -210,7 +228,7 @@ services:
       - aether-net
 
   spiffe-helper-agent:
-    image: ghcr.io/spiffe/spiffe-helper:0.8.4
+    image: ghcr.io/spiffe/spiffe-helper:0.8.0
     command: ["-config", "/run/spiffe/helper.conf"]
     labels:
       aether-guard.service: "agent"
@@ -236,6 +254,28 @@ services:
     command: ["server", "/data", "--console-address", ":9001"]
     volumes:
       - minio_data:/data
+    restart: always
+    networks:
+      - aether-net
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.97.0
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./infrastructure/otel/collector.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    restart: always
+    networks:
+      - aether-net
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.54
+    ports:
+      - "16686:16686"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
     restart: always
     networks:
       - aether-net

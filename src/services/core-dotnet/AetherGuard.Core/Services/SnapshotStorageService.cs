@@ -231,7 +231,7 @@ public sealed class SnapshotStorageService
             return [];
         }
 
-        var clampedMax = Math.Clamp(maxEntries, 1, 200);
+        var clampedMax = Math.Clamp(maxEntries, 1, 10000);
         var snapshots = new List<SnapshotDescriptor>();
 
         if (UsesS3)
@@ -324,6 +324,71 @@ public sealed class SnapshotStorageService
             .OrderByDescending(item => item.LastModifiedUtc)
             .Take(clampedMax)
             .ToList();
+    }
+
+    public async Task<bool> DeleteSnapshotAsync(SnapshotDescriptor snapshot, CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(snapshot.LocalPath))
+        {
+            if (!File.Exists(snapshot.LocalPath))
+            {
+                return false;
+            }
+
+            File.Delete(snapshot.LocalPath);
+            return true;
+        }
+
+        if (UsesS3 && !string.IsNullOrWhiteSpace(snapshot.ObjectKey))
+        {
+            await _s3Client!.DeleteObjectAsync(
+                _settings.S3.Bucket,
+                snapshot.ObjectKey,
+                cancellationToken);
+            return true;
+        }
+
+        return false;
+    }
+
+    public async Task TryApplyS3LifecycleAsync(int expirationDays, CancellationToken cancellationToken)
+    {
+        if (!UsesS3 || expirationDays <= 0)
+        {
+            return;
+        }
+
+        await EnsureBucketReadyAsync(cancellationToken);
+
+        var prefix = _settings.S3.Prefix.Trim('/');
+        var rule = new LifecycleRule
+        {
+            Id = "aether-guard-snapshot-expiration",
+            Status = LifecycleRuleStatus.Enabled,
+            Filter = string.IsNullOrEmpty(prefix)
+                ? new LifecycleFilter()
+                : new LifecycleFilter
+                {
+                    LifecycleFilterPredicate = new LifecyclePrefixPredicate { Prefix = prefix + "/" }
+                },
+            Expiration = new LifecycleRuleExpiration { Days = expirationDays }
+        };
+
+        var request = new PutLifecycleConfigurationRequest
+        {
+            BucketName = _settings.S3.Bucket,
+            Configuration = new LifecycleConfiguration { Rules = [rule] }
+        };
+
+        try
+        {
+            await _s3Client!.PutLifecycleConfigurationAsync(request, cancellationToken);
+            _logger.LogInformation("Applied S3 lifecycle expiration of {Days} days.", expirationDays);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to apply S3 lifecycle configuration.");
+        }
     }
 
     public async Task<bool> HasSnapshotAsync(string workloadId, CancellationToken cancellationToken)

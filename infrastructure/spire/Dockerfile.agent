@@ -1,0 +1,10 @@
+FROM ghcr.io/spiffe/spire-agent:1.8.2 AS spire-agent
+
+FROM alpine:3.19
+RUN apk add --no-cache ca-certificates
+
+COPY --from=spire-agent /opt/spire/bin/spire-agent /opt/spire/bin/spire-agent
+COPY agent-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

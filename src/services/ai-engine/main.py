@@ -1,7 +1,15 @@
 import logging
+import os
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from model import RiskScorer
 
@@ -21,6 +29,7 @@ class RiskPayload(BaseModel):
 
 @app.on_event("startup")
 def load_model() -> None:
+    configure_tracing()
     app.state.scorer = scorer
     logger.info("AI Engine Online.")
 
@@ -50,6 +59,22 @@ def analyze(payload: RiskPayload) -> dict:
         "rca": rca,
         "confidence": confidence,
     }
+
+
+def configure_tracing() -> None:
+    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+    if not endpoint:
+        return
+
+    service_name = os.getenv("OTEL_SERVICE_NAME", "aether-guard-ai")
+    resource = Resource.create({"service.name": service_name})
+    provider = TracerProvider(resource=resource)
+    exporter = OTLPSpanExporter(endpoint=endpoint)
+    provider.add_span_processor(BatchSpanProcessor(exporter))
+    trace.set_tracer_provider(provider)
+
+    RequestsInstrumentor().instrument()
+    FastAPIInstrumentor.instrument_app(app)
 
 
 if __name__ == "__main__":

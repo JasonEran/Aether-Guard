@@ -38,16 +38,19 @@ Check bootstrap status:
 docker compose logs spire-bootstrap
 ```
 
-Inspect certificates (from helper containers):
+Inspect certificates (from the services that consume them):
 
 ```bash
-docker compose exec spiffe-helper-core ls -la /run/spiffe/certs
-docker compose exec spiffe-helper-agent ls -la /run/spiffe/certs
+docker compose exec core-service ls -la /run/spiffe/certs
+docker compose exec agent-service ls -la /run/spiffe/certs
 ```
 
 ## Notes
 
 - The SPIRE agent mounts the Docker Engine socket to attest workloads by label.
+- Docker Desktop/cgroup v2 uses nonstandard cgroup paths; the compose file and
+  agent config include `pid: host` plus a `/../<id>` cgroup matcher so docker
+  label attestation works out of the box.
 - SPIFFE SVIDs use URI SANs rather than DNS SANs; the agent disables hostname
   verification by default (`AG_MTLS_VERIFY_HOST=false`) while still verifying
   the trust bundle.

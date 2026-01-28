@@ -13,12 +13,15 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
-COPY CMakeLists.txt .
-COPY *.cpp .
-COPY *.hpp .
-COPY tests ./tests
+COPY src/services/agent-cpp/CMakeLists.txt /src/services/agent-cpp/
+COPY src/services/agent-cpp/*.cpp /src/services/agent-cpp/
+COPY src/services/agent-cpp/*.hpp /src/services/agent-cpp/
+COPY src/services/agent-cpp/tests /src/services/agent-cpp/tests
+COPY src/shared/protos /src/shared/protos
 
-RUN cmake . && make
+WORKDIR /src/services/agent-cpp
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DAETHER_ENABLE_GRPC=OFF \
+    && cmake --build build --parallel 2
 
 FROM ubuntu:22.04 AS runtime
 
@@ -34,8 +37,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY --from=builder /src/AetherAgent ./AetherAgent
-COPY --from=builder /src/_deps/cpr-build/cpr/libcpr.so* /usr/lib/
+COPY --from=builder /src/services/agent-cpp/build/AetherAgent ./AetherAgent
+COPY --from=builder /src/services/agent-cpp/build/_deps/cpr-build/cpr/libcpr.so* /usr/lib/
 RUN ldconfig
 
 CMD ["./AetherAgent"]
