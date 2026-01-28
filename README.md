@@ -18,7 +18,7 @@ v2.2 reference architecture with a concrete implementation guide.
 
 ## Project Status
 
-- Stage: MVP implementation in repo; v2.2 is a reference architecture target
+- Stage: v2.2 baseline delivered (Phase 0-4). Remaining productization gaps tracked below.
 - License: MIT
 - Authors: Qi Junyi, Xiao Erdong (2026)
 
@@ -54,8 +54,9 @@ This project targets a product-grade release, not a demo. The following standard
 - Agent handshake: registration accepts capability payloads and returns AgentConfig to drive feature gating.
 - AI Engine (FastAPI): volatility and trend rules; Core currently sends empty spotPriceHistory (see Risk Logic).
 - Dashboard (Next.js): telemetry and command visibility with NextAuth credentials.
-- Storage: snapshots stored on local filesystem by default; optional S3/MinIO backend via SnapshotStorage settings.
+- Storage: snapshots stored on local filesystem by default; optional S3/MinIO backend with retention sweeper and S3 lifecycle support.
 - Security: API key for command endpoints; SPIRE mTLS for agent/core; OpenTelemetry baseline across core/AI/dashboard.
+- Supply chain: SBOM generation, cosign signing, and SLSA provenance in CI.
 
 ### Productization Gaps (v1.x)
 

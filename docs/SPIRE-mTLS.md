@@ -1,6 +1,6 @@
 # SPIRE mTLS (Docker Compose)
 
-This repo ships a SPIRE-based mTLS setup for the agent ↔ core path with
+This repo ships a SPIRE-based mTLS setup for the agent <-> core path with
 automatic certificate rotation.
 
 ## Components
