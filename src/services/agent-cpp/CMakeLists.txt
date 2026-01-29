@@ -9,6 +9,7 @@ include(FetchContent)
 
 option(AETHER_ENABLE_GRPC "Build gRPC stubs for agent protos." ON)
 option(AETHER_USE_LOCAL_PROTOBUF "Use third_party/protobuf when available." ON)
+option(AETHER_GRPC_USE_ARCHIVE "Use gRPC release archive (no submodules)." OFF)
 
 if(WIN32)
     set(CPR_USE_SYSTEM_CURL OFF CACHE BOOL "" FORCE)
@@ -46,12 +47,29 @@ if(AETHER_ENABLE_GRPC)
     set(gRPC_SSL_PROVIDER "module" CACHE STRING "" FORCE)
     set(gRPC_ZLIB_PROVIDER "module" CACHE STRING "" FORCE)
 
-    FetchContent_Declare(
-        grpc
-        GIT_REPOSITORY https://github.com/grpc/grpc.git
-        GIT_TAG v1.63.2
-        GIT_SHALLOW TRUE
-    )
+    if(AETHER_GRPC_USE_ARCHIVE)
+        FetchContent_Declare(
+            grpc
+            URL https://github.com/grpc/grpc/archive/refs/tags/v1.63.2.zip
+            URL_HASH SHA256=c2fccc3c1acff569f23c2721dcb058ef2e562784757c76ae965e980a7688657d
+            DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+            PATCH_COMMAND ${CMAKE_COMMAND}
+                -DGRPC_ROOT=<SOURCE_DIR>
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/patch-grpc-deps.cmake
+        )
+    else()
+        FetchContent_Declare(
+            grpc
+            GIT_REPOSITORY https://github.com/grpc/grpc.git
+            GIT_TAG v1.63.2
+            GIT_SHALLOW TRUE
+            GIT_SUBMODULES_RECURSE TRUE
+            GIT_PROGRESS TRUE
+            PATCH_COMMAND ${CMAKE_COMMAND}
+                -DGRPC_ROOT=<SOURCE_DIR>
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/patch-grpc-deps.cmake
+        )
+    endif()
 endif()
 
 set(protobuf_BUILD_TESTS OFF CACHE BOOL "" FORCE)

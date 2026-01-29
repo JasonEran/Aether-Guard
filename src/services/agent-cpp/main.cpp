@@ -50,18 +50,49 @@ bool DetectEbpfAvailable() {
 #endif
 }
 
-std::string GetEnvOrDefault(const char* name, const std::string& defaultValue) {
+struct EnvValue {
+    bool found = false;
+    std::string value;
+};
+
+EnvValue GetEnvValue(const char* name) {
+#ifdef _WIN32
+    char* value = nullptr;
+    size_t length = 0;
+    if (_dupenv_s(&value, &length, name) != 0 || value == nullptr) {
+        return {};
+    }
+
+    EnvValue result;
+    result.found = true;
+    result.value = value;
+    free(value);
+    return result;
+#else
     const char* value = std::getenv(name);
-    return value ? std::string(value) : defaultValue;
+    if (value == nullptr) {
+        return {};
+    }
+
+    EnvValue result;
+    result.found = true;
+    result.value = value;
+    return result;
+#endif
+}
+
+std::string GetEnvOrDefault(const char* name, const std::string& defaultValue) {
+    EnvValue value = GetEnvValue(name);
+    return value.found ? value.value : defaultValue;
 }
 
 bool GetEnvBool(const char* name, bool defaultValue) {
-    const char* value = std::getenv(name);
-    if (!value) {
+    EnvValue value = GetEnvValue(name);
+    if (!value.found) {
         return defaultValue;
     }
 
-    std::string normalized(value);
+    std::string normalized = value.value;
     std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
     });

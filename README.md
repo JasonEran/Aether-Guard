@@ -419,16 +419,21 @@ pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-C++ Agent:
-
-```bash
-cd src/services/agent-cpp
-cmake -S . -B build
-cmake --build build
-./build/AetherAgent
-```
-
-Windows build note: install Visual Studio Build Tools, CMake, Ninja, and NASM, and run the build from a VS Developer Command Prompt.
+  C++ Agent:
+  
+  ```bash
+  cd src/services/agent-cpp
+  # Fast local build (no gRPC)
+  cmake -S . -B build_nogrpc -DAETHER_ENABLE_GRPC=OFF -DAETHER_USE_LOCAL_PROTOBUF=ON
+  cmake --build build_nogrpc
+  ./build_nogrpc/AetherAgent
+  # Full gRPC build (longer, fetches submodules)
+  cmake -S . -B build_grpc -DAETHER_ENABLE_GRPC=ON -DAETHER_GRPC_USE_ARCHIVE=OFF
+  cmake --build build_grpc
+  ```
+  
+  Windows build note: install Visual Studio Build Tools, CMake, Ninja, and NASM, and run the build from a VS Developer Command Prompt.
+  If MSBuild reports file-in-use errors, rerun with `cmake --build build_grpc --config Release -- /m:1` and ensure no stale `MSBuild`/`cl` processes are running.
 
 Note: If CRIU is unavailable (Windows/Docker Desktop), the agent runs in simulation mode and still produces a valid snapshot archive for demo flows.
 
