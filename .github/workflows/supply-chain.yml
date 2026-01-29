@@ -39,7 +39,7 @@ jobs:
         id: build
         uses: docker/build-push-action@v5
         with:
-          context: ./src/services/core-dotnet/AetherGuard.Core
+          context: .
           file: ./src/services/core-dotnet/AetherGuard.Core/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -69,7 +69,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.10.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     with:
       image: ${{ needs.build-core.outputs.image }}
       digest: ${{ needs.build-core.outputs.digest }}
@@ -126,7 +126,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.10.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     with:
       image: ${{ needs.build-ai.outputs.image }}
       digest: ${{ needs.build-ai.outputs.digest }}
@@ -183,7 +183,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.10.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     with:
       image: ${{ needs.build-web.outputs.image }}
       digest: ${{ needs.build-web.outputs.digest }}
@@ -210,7 +210,7 @@ jobs:
         id: build
         uses: docker/build-push-action@v5
         with:
-          context: ./src/services/agent-cpp
+          context: .
           file: ./src/services/agent-cpp/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -240,7 +240,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.10.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     with:
       image: ${{ needs.build-agent.outputs.image }}
       digest: ${{ needs.build-agent.outputs.digest }}
