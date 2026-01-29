@@ -70,3 +70,4 @@ coverage/
 Data/
 dummy_snapshot.tar.gz
 .compose.override.temp.yml
+.act-logs/build-ai.log

@@ -24,15 +24,18 @@ jobs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
-        if: ${{ !env.ACT }}
         with:
           fetch-depth: 0
       - name: Configure git safe directory
-        if: ${{ !env.ACT }}
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: docker/setup-buildx-action@v3
+        if: ${{ github.actor == 'nektos/act' }}
+        with:
+          driver: docker
+      - uses: docker/setup-buildx-action@v3
+        if: ${{ github.actor != 'nektos/act' }}
       - uses: docker/login-action@v3
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -40,20 +43,29 @@ jobs:
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
+        if: ${{ github.actor != 'nektos/act' }}
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/core-service
+          context: workflow
+      - name: Set local image tags
+        if: ${{ github.actor == 'nektos/act' }}
+        id: meta-local
+        run: |
+          namespace="$(echo "${{ env.IMAGE_NAMESPACE }}" | tr '[:upper:]' '[:lower:]')"
+          echo "tags=${{ env.REGISTRY }}/${namespace}/core-service:local" >> "$GITHUB_OUTPUT"
+          echo "labels=" >> "$GITHUB_OUTPUT"
       - name: Build and push
         id: build
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./src/services/core-dotnet/AetherGuard.Core/Dockerfile
-          push: ${{ !env.ACT }}
-          load: ${{ env.ACT }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          push: ${{ github.actor == 'nektos/act' && 'false' || 'true' }}
+          load: ${{ github.actor == 'nektos/act' && 'true' || 'false' }}
+          tags: ${{ github.actor == 'nektos/act' && steps.meta-local.outputs.tags || steps.meta.outputs.tags }}
+          labels: ${{ github.actor == 'nektos/act' && steps.meta-local.outputs.labels || steps.meta.outputs.labels }}
       - name: Generate SBOM
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         uses: anchore/sbom-action@v0
         with:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/core-service@${{ steps.build.outputs.digest }}
@@ -62,16 +74,16 @@ jobs:
           format: spdx-json
           output-file: sbom-core.spdx.json
       - name: Upload SBOM
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         uses: actions/upload-artifact@v4
         with:
           name: sbom-core
           path: sbom-core.spdx.json
       - name: Install cosign
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         uses: sigstore/cosign-installer@v3
       - name: Sign image
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         env:
           COSIGN_EXPERIMENTAL: "1"
         run: cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/core-service@${{ steps.build.outputs.digest }}
@@ -96,15 +108,18 @@ jobs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
-        if: ${{ !env.ACT }}
         with:
           fetch-depth: 0
       - name: Configure git safe directory
-        if: ${{ !env.ACT }}
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: docker/setup-buildx-action@v3
+        if: ${{ github.actor == 'nektos/act' }}
+        with:
+          driver: docker
+      - uses: docker/setup-buildx-action@v3
+        if: ${{ github.actor != 'nektos/act' }}
       - uses: docker/login-action@v3
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -112,20 +127,29 @@ jobs:
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
+        if: ${{ github.actor != 'nektos/act' }}
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/ai-service
+          context: workflow
+      - name: Set local image tags
+        if: ${{ github.actor == 'nektos/act' }}
+        id: meta-local
+        run: |
+          namespace="$(echo "${{ env.IMAGE_NAMESPACE }}" | tr '[:upper:]' '[:lower:]')"
+          echo "tags=${{ env.REGISTRY }}/${namespace}/ai-service:local" >> "$GITHUB_OUTPUT"
+          echo "labels=" >> "$GITHUB_OUTPUT"
       - name: Build and push
         id: build
         uses: docker/build-push-action@v5
         with:
           context: ./src/services/ai-engine
           file: ./src/services/ai-engine/Dockerfile
-          push: ${{ !env.ACT }}
-          load: ${{ env.ACT }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          push: ${{ github.actor == 'nektos/act' && 'false' || 'true' }}
+          load: ${{ github.actor == 'nektos/act' && 'true' || 'false' }}
+          tags: ${{ github.actor == 'nektos/act' && steps.meta-local.outputs.tags || steps.meta.outputs.tags }}
+          labels: ${{ github.actor == 'nektos/act' && steps.meta-local.outputs.labels || steps.meta.outputs.labels }}
       - name: Generate SBOM
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         uses: anchore/sbom-action@v0
         with:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/ai-service@${{ steps.build.outputs.digest }}
@@ -134,16 +158,16 @@ jobs:
           format: spdx-json
           output-file: sbom-ai.spdx.json
       - name: Upload SBOM
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         uses: actions/upload-artifact@v4
         with:
           name: sbom-ai
           path: sbom-ai.spdx.json
       - name: Install cosign
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         uses: sigstore/cosign-installer@v3
       - name: Sign image
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         env:
           COSIGN_EXPERIMENTAL: "1"
         run: cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/ai-service@${{ steps.build.outputs.digest }}
@@ -168,15 +192,18 @@ jobs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
-        if: ${{ !env.ACT }}
         with:
           fetch-depth: 0
       - name: Configure git safe directory
-        if: ${{ !env.ACT }}
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: docker/setup-buildx-action@v3
+        if: ${{ github.actor == 'nektos/act' }}
+        with:
+          driver: docker
+      - uses: docker/setup-buildx-action@v3
+        if: ${{ github.actor != 'nektos/act' }}
       - uses: docker/login-action@v3
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -184,20 +211,29 @@ jobs:
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
+        if: ${{ github.actor != 'nektos/act' }}
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/web-service
+          context: workflow
+      - name: Set local image tags
+        if: ${{ github.actor == 'nektos/act' }}
+        id: meta-local
+        run: |
+          namespace="$(echo "${{ env.IMAGE_NAMESPACE }}" | tr '[:upper:]' '[:lower:]')"
+          echo "tags=${{ env.REGISTRY }}/${namespace}/web-service:local" >> "$GITHUB_OUTPUT"
+          echo "labels=" >> "$GITHUB_OUTPUT"
       - name: Build and push
         id: build
         uses: docker/build-push-action@v5
         with:
           context: ./src/web/dashboard
           file: ./src/web/dashboard/Dockerfile
-          push: ${{ !env.ACT }}
-          load: ${{ env.ACT }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          push: ${{ github.actor == 'nektos/act' && 'false' || 'true' }}
+          load: ${{ github.actor == 'nektos/act' && 'true' || 'false' }}
+          tags: ${{ github.actor == 'nektos/act' && steps.meta-local.outputs.tags || steps.meta.outputs.tags }}
+          labels: ${{ github.actor == 'nektos/act' && steps.meta-local.outputs.labels || steps.meta.outputs.labels }}
       - name: Generate SBOM
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         uses: anchore/sbom-action@v0
         with:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/web-service@${{ steps.build.outputs.digest }}
@@ -206,16 +242,16 @@ jobs:
           format: spdx-json
           output-file: sbom-web.spdx.json
       - name: Upload SBOM
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         uses: actions/upload-artifact@v4
         with:
           name: sbom-web
           path: sbom-web.spdx.json
       - name: Install cosign
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         uses: sigstore/cosign-installer@v3
       - name: Sign image
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         env:
           COSIGN_EXPERIMENTAL: "1"
         run: cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/web-service@${{ steps.build.outputs.digest }}
@@ -240,15 +276,18 @@ jobs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
-        if: ${{ !env.ACT }}
         with:
           fetch-depth: 0
       - name: Configure git safe directory
-        if: ${{ !env.ACT }}
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: docker/setup-buildx-action@v3
+        if: ${{ github.actor == 'nektos/act' }}
+        with:
+          driver: docker
+      - uses: docker/setup-buildx-action@v3
+        if: ${{ github.actor != 'nektos/act' }}
       - uses: docker/login-action@v3
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -256,20 +295,29 @@ jobs:
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
+        if: ${{ github.actor != 'nektos/act' }}
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/agent-service
+          context: workflow
+      - name: Set local image tags
+        if: ${{ github.actor == 'nektos/act' }}
+        id: meta-local
+        run: |
+          namespace="$(echo "${{ env.IMAGE_NAMESPACE }}" | tr '[:upper:]' '[:lower:]')"
+          echo "tags=${{ env.REGISTRY }}/${namespace}/agent-service:local" >> "$GITHUB_OUTPUT"
+          echo "labels=" >> "$GITHUB_OUTPUT"
       - name: Build and push
         id: build
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./src/services/agent-cpp/Dockerfile
-          push: ${{ !env.ACT }}
-          load: ${{ env.ACT }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          push: ${{ github.actor == 'nektos/act' && 'false' || 'true' }}
+          load: ${{ github.actor == 'nektos/act' && 'true' || 'false' }}
+          tags: ${{ github.actor == 'nektos/act' && steps.meta-local.outputs.tags || steps.meta.outputs.tags }}
+          labels: ${{ github.actor == 'nektos/act' && steps.meta-local.outputs.labels || steps.meta.outputs.labels }}
       - name: Generate SBOM
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         uses: anchore/sbom-action@v0
         with:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/agent-service@${{ steps.build.outputs.digest }}
@@ -278,16 +326,16 @@ jobs:
           format: spdx-json
           output-file: sbom-agent.spdx.json
       - name: Upload SBOM
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         uses: actions/upload-artifact@v4
         with:
           name: sbom-agent
           path: sbom-agent.spdx.json
       - name: Install cosign
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         uses: sigstore/cosign-installer@v3
       - name: Sign image
-        if: ${{ !env.ACT }}
+        if: ${{ github.actor != 'nektos/act' }}
         env:
           COSIGN_EXPERIMENTAL: "1"
         run: cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/agent-service@${{ steps.build.outputs.digest }}
