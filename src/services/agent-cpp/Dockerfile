@@ -16,6 +16,7 @@ WORKDIR /src
 COPY src/services/agent-cpp/CMakeLists.txt /src/services/agent-cpp/
 COPY src/services/agent-cpp/*.cpp /src/services/agent-cpp/
 COPY src/services/agent-cpp/*.hpp /src/services/agent-cpp/
+COPY src/services/agent-cpp/cmake /src/services/agent-cpp/cmake
 COPY src/services/agent-cpp/tests /src/services/agent-cpp/tests
 COPY src/shared/protos /src/shared/protos
 
