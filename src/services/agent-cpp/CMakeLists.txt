@@ -11,6 +11,12 @@ option(AETHER_ENABLE_GRPC "Build gRPC stubs for agent protos." ON)
 option(AETHER_USE_LOCAL_PROTOBUF "Use third_party/protobuf when available." ON)
 option(AETHER_GRPC_USE_ARCHIVE "Use gRPC release archive (no submodules)." OFF)
 
+# CMake < 3.24 doesn't understand DOWNLOAD_EXTRACT_TIMESTAMP, which breaks ExternalProject.
+set(_AETHER_FC_EXTRACT_TIMESTAMP)
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.24)
+    list(APPEND _AETHER_FC_EXTRACT_TIMESTAMP DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+endif()
+
 if(WIN32)
     set(CPR_USE_SYSTEM_CURL OFF CACHE BOOL "" FORCE)
     set(CURL_ZLIB OFF CACHE STRING "" FORCE)
@@ -23,7 +29,7 @@ FetchContent_Declare(
     nlohmann_json
     URL https://github.com/nlohmann/json/archive/refs/tags/v3.11.2.zip
     URL_HASH SHA256=95651d7d1fcf2e5c3163c3d37df6d6b3e9e5027299e6bd050d157322ceda9ac9
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    ${_AETHER_FC_EXTRACT_TIMESTAMP}
     PATCH_COMMAND ${CMAKE_COMMAND}
         -DNLOHMANN_JSON_CMAKE_FILE=<SOURCE_DIR>/CMakeLists.txt
         -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/patch-nlohmann-json.cmake
@@ -33,7 +39,7 @@ FetchContent_Declare(
     cpr
     URL https://github.com/libcpr/cpr/archive/refs/tags/1.10.4.zip
     URL_HASH SHA256=faf4f8340eafcb5834202c8dc43d8f0bcbd193fb810b05dc4502d4c67ea4d11d
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    ${_AETHER_FC_EXTRACT_TIMESTAMP}
 )
 
 if(AETHER_ENABLE_GRPC)
@@ -52,7 +58,7 @@ if(AETHER_ENABLE_GRPC)
             grpc
             URL https://github.com/grpc/grpc/archive/refs/tags/v1.63.2.zip
             URL_HASH SHA256=c2fccc3c1acff569f23c2721dcb058ef2e562784757c76ae965e980a7688657d
-            DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+            ${_AETHER_FC_EXTRACT_TIMESTAMP}
             PATCH_COMMAND ${CMAKE_COMMAND}
                 -DGRPC_ROOT=<SOURCE_DIR>
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/patch-grpc-deps.cmake

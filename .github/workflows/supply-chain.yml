@@ -52,6 +52,8 @@ jobs:
         uses: anchore/sbom-action@v0
         with:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/core-service@${{ steps.build.outputs.digest }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
           format: spdx-json
           output-file: sbom-core.spdx.json
       - name: Upload SBOM
@@ -113,6 +115,8 @@ jobs:
         uses: anchore/sbom-action@v0
         with:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/ai-service@${{ steps.build.outputs.digest }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
           format: spdx-json
           output-file: sbom-ai.spdx.json
       - name: Upload SBOM
@@ -174,6 +178,8 @@ jobs:
         uses: anchore/sbom-action@v0
         with:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/web-service@${{ steps.build.outputs.digest }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
           format: spdx-json
           output-file: sbom-web.spdx.json
       - name: Upload SBOM
@@ -235,6 +241,8 @@ jobs:
         uses: anchore/sbom-action@v0
         with:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/agent-service@${{ steps.build.outputs.digest }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
           format: spdx-json
           output-file: sbom-agent.spdx.json
       - name: Upload SBOM
