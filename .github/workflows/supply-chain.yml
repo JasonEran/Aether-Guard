@@ -67,6 +67,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      packages: write
       id-token: write
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.10.0
     with:
@@ -123,6 +124,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      packages: write
       id-token: write
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.10.0
     with:
@@ -179,6 +181,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      packages: write
       id-token: write
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.10.0
     with:
@@ -235,6 +238,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      packages: write
       id-token: write
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.10.0
     with:
