@@ -13,6 +13,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: ${{ github.actor != 'nektos/act' }}
     outputs:
       hashes: ${{ steps.hash.outputs.hashes }}
     steps:
@@ -38,6 +39,7 @@ jobs:
 
   provenance:
     needs: build
+    if: ${{ github.actor != 'nektos/act' }}
     permissions:
       actions: read
       contents: write
