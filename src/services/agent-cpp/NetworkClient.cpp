@@ -78,10 +78,19 @@ cpr::Header AddTraceParentHeader(cpr::Header headers) {
     headers["traceparent"] = BuildTraceParent();
     return headers;
 }
+
+cpr::Header AddApiKeyHeader(cpr::Header headers, const std::string& apiKey) {
+    if (!apiKey.empty()) {
+        headers["X-API-Key"] = apiKey;
+    }
+    return headers;
+}
 } // namespace
 
-NetworkClient::NetworkClient(std::string baseUrl, TlsSettings tlsSettings)
-    : baseUrl_(std::move(baseUrl)), tlsSettings_(std::move(tlsSettings)) {}
+NetworkClient::NetworkClient(std::string baseUrl, TlsSettings tlsSettings, std::string apiKey)
+    : baseUrl_(std::move(baseUrl)),
+      tlsSettings_(std::move(tlsSettings)),
+      apiKey_(std::move(apiKey)) {}
 
 bool NetworkClient::Register(
     const std::string& hostname,
@@ -104,16 +113,20 @@ bool NetworkClient::Register(
         }}
     };
 
+    cpr::Header headers{{"Content-Type", "application/json"}};
+    headers = AddTraceParentHeader(std::move(headers));
+    headers = AddApiKeyHeader(std::move(headers), apiKey_);
+
     cpr::Response response = tlsSettings_.enabled
         ? cpr::Post(
             cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/register")},
             cpr::Body{payload.dump()},
-            AddTraceParentHeader(cpr::Header{{"Content-Type", "application/json"}}),
+            headers,
             BuildSslOptions(tlsSettings_))
         : cpr::Post(
             cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/register")},
             cpr::Body{payload.dump()},
-            AddTraceParentHeader(cpr::Header{{"Content-Type", "application/json"}}));
+            headers);
 
     if (response.error.code != cpr::ErrorCode::OK) {
         std::cerr << "[Agent] register failed: " << response.error.message << std::endl;
@@ -166,6 +179,7 @@ bool NetworkClient::SendHeartbeat(
         headers["Authorization"] = "Bearer " + token;
     }
     headers = AddTraceParentHeader(std::move(headers));
+    headers = AddApiKeyHeader(std::move(headers), apiKey_);
 
     for (int attempt = 0; attempt < kMaxRetries; ++attempt) {
         cpr::Response response = tlsSettings_.enabled
@@ -224,16 +238,17 @@ bool NetworkClient::PollCommands(const std::string& agentId, std::vector<Command
         return false;
     }
 
+    cpr::Header headers = AddApiKeyHeader(AddTraceParentHeader(cpr::Header{}), apiKey_);
     cpr::Response response = tlsSettings_.enabled
         ? cpr::Get(
             cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/poll")},
             cpr::Parameters{{"agentId", agentId}},
-            AddTraceParentHeader(cpr::Header{}),
+            headers,
             BuildSslOptions(tlsSettings_))
         : cpr::Get(
             cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/poll")},
             cpr::Parameters{{"agentId", agentId}},
-            AddTraceParentHeader(cpr::Header{}));
+            headers);
 
     if (response.error.code != cpr::ErrorCode::OK) {
         std::cerr << "[Agent] poll failed: " << response.error.message << std::endl;
@@ -284,16 +299,20 @@ bool NetworkClient::SendFeedback(const std::string& agentId, const CommandFeedba
         {"error", feedback.error}
     };
 
+    cpr::Header headers{{"Content-Type", "application/json"}};
+    headers = AddTraceParentHeader(std::move(headers));
+    headers = AddApiKeyHeader(std::move(headers), apiKey_);
+
     cpr::Response response = tlsSettings_.enabled
         ? cpr::Post(
             cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/feedback")},
             cpr::Body{payload.dump()},
-            AddTraceParentHeader(cpr::Header{{"Content-Type", "application/json"}}),
+            headers,
             BuildSslOptions(tlsSettings_))
         : cpr::Post(
             cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/feedback")},
             cpr::Body{payload.dump()},
-            AddTraceParentHeader(cpr::Header{{"Content-Type", "application/json"}}));
+            headers);
 
     if (response.error.code != cpr::ErrorCode::OK) {
         std::cerr << "[Agent] feedback failed: " << response.error.message << std::endl;
@@ -319,18 +338,19 @@ bool NetworkClient::UploadSnapshot(const std::string& url, const std::string& fi
     }
 
     for (int attempt = 0; attempt < kMaxRetries; ++attempt) {
+        cpr::Header headers = AddApiKeyHeader(AddTraceParentHeader(cpr::Header{}), apiKey_);
         cpr::Response response = tlsSettings_.enabled
             ? cpr::Post(
                 cpr::Url{url},
                 cpr::Multipart{{"file", cpr::File{filePath}}},
-                AddTraceParentHeader(cpr::Header{}),
+                headers,
                 cpr::ConnectTimeout{kConnectTimeout},
                 cpr::LowSpeed{kLowSpeedBytesPerSecond, kLowSpeedTimeoutSeconds},
                 BuildSslOptions(tlsSettings_))
             : cpr::Post(
                 cpr::Url{url},
                 cpr::Multipart{{"file", cpr::File{filePath}}},
-                AddTraceParentHeader(cpr::Header{}),
+                headers,
                 cpr::ConnectTimeout{kConnectTimeout},
                 cpr::LowSpeed{kLowSpeedBytesPerSecond, kLowSpeedTimeoutSeconds});
 
@@ -372,9 +392,10 @@ bool NetworkClient::DownloadSnapshot(const std::string& url, const std::string& 
         }
     }
 
+    cpr::Header headers = AddApiKeyHeader(AddTraceParentHeader(cpr::Header{}), apiKey_);
     cpr::Response response = tlsSettings_.enabled
-        ? cpr::Get(cpr::Url{url}, AddTraceParentHeader(cpr::Header{}), BuildSslOptions(tlsSettings_))
-        : cpr::Get(cpr::Url{url}, AddTraceParentHeader(cpr::Header{}));
+        ? cpr::Get(cpr::Url{url}, headers, BuildSslOptions(tlsSettings_))
+        : cpr::Get(cpr::Url{url}, headers);
 
     if (response.error.code != cpr::ErrorCode::OK) {
         std::cerr << "[Agent] download failed: " << response.error.message << std::endl;

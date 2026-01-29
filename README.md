@@ -60,7 +60,6 @@ This project targets a product-grade release, not a demo. The following standard
 
 ### Productization Gaps (v1.x)
 
-- No end-to-end auth on telemetry or artifacts; command API key only.
 - No schema registry or compatibility policy for MQ events.
 - Agent-side OpenTelemetry spans are not yet emitted (server-side spans/metrics are wired).
 
@@ -162,6 +161,11 @@ This project targets a product-grade release, not a demo. The following standard
 ## Quick Start (Docker)
 
 ```bash
+# PowerShell
+$env:COMMAND_API_KEY="changeme"
+# Bash
+export COMMAND_API_KEY=changeme
+
 docker compose up --build -d
 ```
 
@@ -291,6 +295,12 @@ Dashboard auth (docker-compose.yml):
 - AUTH_TRUST_HOST=true
 
 For production, set a strong AUTH_SECRET and use a secret manager.
+
+Telemetry + artifact API keys (core-service/agent-service):
+
+- Security__TelemetryApiKey=${COMMAND_API_KEY}
+- Security__ArtifactApiKey=${COMMAND_API_KEY}
+- AG_API_KEY=${COMMAND_API_KEY}
 
 ### SPIRE mTLS (Docker Compose)
 

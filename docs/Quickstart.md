@@ -17,6 +17,11 @@ python scripts/self_check.py --target docker
 ## Start the stack
 
 ```bash
+# PowerShell
+$env:COMMAND_API_KEY="changeme"
+# Bash
+export COMMAND_API_KEY=changeme
+
 docker compose up --build -d
 ```
 

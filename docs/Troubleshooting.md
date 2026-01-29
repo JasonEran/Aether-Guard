@@ -59,6 +59,14 @@ Fix:
 - Ensure `COMMAND_API_KEY` (or `DIAGNOSTICS_API_KEY`) is set in the environment.
 - For dashboard export, log in as an admin user.
 
+### Telemetry ingestion or snapshot upload returns 401
+
+Cause: API key missing or mismatched between core and agent/clients.
+
+Fix:
+- Set `Security__TelemetryApiKey` / `Security__ArtifactApiKey` on core (defaults to `COMMAND_API_KEY`).
+- Ensure agents or clients send `X-API-Key` (agent uses `AG_API_KEY`).
+
 ### Snapshot uploads or downloads fail
 
 Cause: misconfigured snapshot storage.

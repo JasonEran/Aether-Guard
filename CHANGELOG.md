@@ -11,6 +11,7 @@ Semantic Versioning.
 - OpenTelemetry collector + Jaeger stack with core/AI/dashboard exporters.
 - Snapshot retention sweeper with optional S3 lifecycle configuration.
 - Supply-chain workflow for SBOM generation, cosign signing, and SLSA container provenance.
+- API key protection for telemetry ingestion and snapshot artifact endpoints.
 
 ### Changed
 - Agent now injects W3C trace headers for HTTP requests.

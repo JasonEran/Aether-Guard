@@ -119,7 +119,8 @@ int main() {
         }
     }
 
-    NetworkClient client(coreUrl, tlsSettings);
+    const std::string apiKey = GetEnvOrDefault("AG_API_KEY", "");
+    NetworkClient client(coreUrl, tlsSettings, apiKey);
     LifecycleManager lifecycle(client, coreUrl);
 
     std::string hostname = "unknown-host";

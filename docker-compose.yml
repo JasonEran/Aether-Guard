@@ -74,6 +74,7 @@ services:
       AG_MTLS_KEY_PATH: "/run/spiffe/certs/svid_key.pem"
       AG_MTLS_CA_PATH: "/run/spiffe/certs/bundle.pem"
       AG_MTLS_VERIFY_HOST: "false"
+      AG_API_KEY: "${COMMAND_API_KEY}"
     depends_on:
       - core-service
       - spiffe-helper-agent

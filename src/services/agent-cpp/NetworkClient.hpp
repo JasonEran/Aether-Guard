@@ -54,7 +54,7 @@ struct TlsSettings {
 
 class NetworkClient {
 public:
-    explicit NetworkClient(std::string baseUrl, TlsSettings tlsSettings = {});
+    explicit NetworkClient(std::string baseUrl, TlsSettings tlsSettings = {}, std::string apiKey = {});
 
     bool Register(
         const std::string& hostname,
@@ -77,4 +77,5 @@ public:
 private:
     std::string baseUrl_;
     TlsSettings tlsSettings_;
+    std::string apiKey_;
 };

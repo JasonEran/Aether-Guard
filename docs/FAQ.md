@@ -74,3 +74,9 @@ curl -H "X-API-Key: $COMMAND_API_KEY" \
 ```
 
 Admins can also export it from the dashboard Control Panel.
+
+## Why do I get 401 on telemetry or snapshot endpoints?
+
+Telemetry ingestion and artifact upload/download require `X-API-Key`. Configure
+`Security__TelemetryApiKey` / `Security__ArtifactApiKey` (defaults to `COMMAND_API_KEY`)
+and ensure agents send `AG_API_KEY`.

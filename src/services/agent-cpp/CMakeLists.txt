@@ -8,6 +8,7 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 include(FetchContent)
 
 option(AETHER_ENABLE_GRPC "Build gRPC stubs for agent protos." ON)
+option(AETHER_USE_LOCAL_PROTOBUF "Use third_party/protobuf when available." ON)
 
 if(WIN32)
     set(CPR_USE_SYSTEM_CURL OFF CACHE BOOL "" FORCE)
@@ -19,14 +20,19 @@ set(CPR_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 
 FetchContent_Declare(
     nlohmann_json
-    GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG v3.11.2
+    URL https://github.com/nlohmann/json/archive/refs/tags/v3.11.2.zip
+    URL_HASH SHA256=95651d7d1fcf2e5c3163c3d37df6d6b3e9e5027299e6bd050d157322ceda9ac9
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    PATCH_COMMAND ${CMAKE_COMMAND}
+        -DNLOHMANN_JSON_CMAKE_FILE=<SOURCE_DIR>/CMakeLists.txt
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/patch-nlohmann-json.cmake
 )
 
 FetchContent_Declare(
     cpr
-    GIT_REPOSITORY https://github.com/libcpr/cpr.git
-    GIT_TAG 1.10.4
+    URL https://github.com/libcpr/cpr/archive/refs/tags/1.10.4.zip
+    URL_HASH SHA256=faf4f8340eafcb5834202c8dc43d8f0bcbd193fb810b05dc4502d4c67ea4d11d
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
 if(AETHER_ENABLE_GRPC)
@@ -44,6 +50,7 @@ if(AETHER_ENABLE_GRPC)
         grpc
         GIT_REPOSITORY https://github.com/grpc/grpc.git
         GIT_TAG v1.63.2
+        GIT_SHALLOW TRUE
     )
 endif()
 
@@ -53,11 +60,20 @@ set(protobuf_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 if(AETHER_ENABLE_GRPC)
     FetchContent_MakeAvailable(nlohmann_json cpr grpc)
 else()
-    FetchContent_Declare(
-        protobuf
-        GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
-        GIT_TAG v25.3
-    )
+    set(_LOCAL_PROTOBUF_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../third_party/protobuf)
+    if(AETHER_USE_LOCAL_PROTOBUF AND EXISTS ${_LOCAL_PROTOBUF_DIR}/CMakeLists.txt)
+        FetchContent_Declare(
+            protobuf
+            SOURCE_DIR ${_LOCAL_PROTOBUF_DIR}
+        )
+    else()
+        FetchContent_Declare(
+            protobuf
+            GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
+            GIT_TAG v25.3
+            GIT_SHALLOW TRUE
+        )
+    endif()
     FetchContent_MakeAvailable(nlohmann_json cpr protobuf)
 endif()
 

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Security.Cryptography;
 using AetherGuard.Core.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -9,15 +10,20 @@ namespace AetherGuard.Core.Controllers;
 [Route("api/v1/artifacts")]
 public class ArtifactController : ControllerBase
 {
+    private const string ApiKeyHeader = "X-API-Key";
     private readonly ILogger<ArtifactController> _logger;
     private readonly SnapshotStorageService _snapshotStorage;
+    private readonly string? _artifactApiKey;
 
     public ArtifactController(
         SnapshotStorageService snapshotStorage,
-        ILogger<ArtifactController> logger)
+        ILogger<ArtifactController> logger,
+        IConfiguration configuration)
     {
         _logger = logger;
         _snapshotStorage = snapshotStorage;
+        _artifactApiKey = configuration["Security:ArtifactApiKey"]
+            ?? configuration["Security:CommandApiKey"];
     }
 
     [HttpPost("upload/{workloadId}")]
@@ -27,6 +33,11 @@ public class ArtifactController : ControllerBase
         [FromForm] IFormFile file,
         CancellationToken cancellationToken)
     {
+        if (!TryAuthorize(out var failure))
+        {
+            return failure;
+        }
+
         if (string.IsNullOrWhiteSpace(workloadId))
         {
             return BadRequest(new { error = "WorkloadId is required." });
@@ -71,6 +82,11 @@ public class ArtifactController : ControllerBase
     [HttpGet("/download/{workloadId}")]
     public async Task<IActionResult> Download(string workloadId, CancellationToken cancellationToken)
     {
+        if (!TryAuthorize(out var failure))
+        {
+            return failure;
+        }
+
         if (string.IsNullOrWhiteSpace(workloadId))
         {
             return BadRequest(new { error = "WorkloadId is required." });
@@ -108,5 +124,42 @@ public class ArtifactController : ControllerBase
             "application/gzip",
             snapshot.FileName,
             enableRangeProcessing: true);
+    }
+
+    private bool TryAuthorize(out IActionResult failure)
+    {
+        if (string.IsNullOrWhiteSpace(_artifactApiKey))
+        {
+            _logger.LogError("Security:ArtifactApiKey is not configured.");
+            failure = StatusCode(StatusCodes.Status500InternalServerError, new { error = "Artifact API key not configured." });
+            return false;
+        }
+
+        if (!Request.Headers.TryGetValue(ApiKeyHeader, out var providedKey))
+        {
+            failure = Unauthorized(new { error = "Missing API key." });
+            return false;
+        }
+
+        if (!FixedTimeEquals(providedKey.ToString(), _artifactApiKey))
+        {
+            failure = Unauthorized(new { error = "Invalid API key." });
+            return false;
+        }
+
+        failure = null!;
+        return true;
+    }
+
+    private static bool FixedTimeEquals(string provided, string expected)
+    {
+        var providedBytes = System.Text.Encoding.UTF8.GetBytes(provided);
+        var expectedBytes = System.Text.Encoding.UTF8.GetBytes(expected);
+        if (providedBytes.Length != expectedBytes.Length)
+        {
+            return false;
+        }
+
+        return CryptographicOperations.FixedTimeEquals(providedBytes, expectedBytes);
     }
 }
