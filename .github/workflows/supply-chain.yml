@@ -14,18 +14,23 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAMESPACE: ${{ github.repository }}
 
 jobs:
   build-core:
     runs-on: ubuntu-latest
     outputs:
-      image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/core-service
+      image: ${{ steps.image-vars.outputs.image_base }}/core-service
       digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Set image namespace
+        id: image-vars
+        run: |
+          namespace="$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
+          echo "namespace=$namespace" >> "$GITHUB_OUTPUT"
+          echo "image_base=${{ env.REGISTRY }}/$namespace" >> "$GITHUB_OUTPUT"
       - name: Configure git safe directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: docker/setup-buildx-action@v3
@@ -45,14 +50,13 @@ jobs:
         uses: docker/metadata-action@v5
         if: ${{ github.actor != 'nektos/act' }}
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/core-service
+          images: ${{ steps.image-vars.outputs.image_base }}/core-service
           context: workflow
       - name: Set local image tags
         if: ${{ github.actor == 'nektos/act' }}
         id: meta-local
         run: |
-          namespace="$(echo "${{ env.IMAGE_NAMESPACE }}" | tr '[:upper:]' '[:lower:]')"
-          echo "tags=${{ env.REGISTRY }}/${namespace}/core-service:local" >> "$GITHUB_OUTPUT"
+          echo "tags=${{ steps.image-vars.outputs.image_base }}/core-service:local" >> "$GITHUB_OUTPUT"
           echo "labels=" >> "$GITHUB_OUTPUT"
       - name: Build and push
         id: build
@@ -68,7 +72,7 @@ jobs:
         if: ${{ github.actor != 'nektos/act' }}
         uses: anchore/sbom-action@v0
         with:
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/core-service@${{ steps.build.outputs.digest }}
+          image: ${{ steps.image-vars.outputs.image_base }}/core-service@${{ steps.build.outputs.digest }}
           registry-username: ${{ github.actor }}
           registry-password: ${{ secrets.GITHUB_TOKEN }}
           format: spdx-json
@@ -86,7 +90,7 @@ jobs:
         if: ${{ github.actor != 'nektos/act' }}
         env:
           COSIGN_EXPERIMENTAL: "1"
-        run: cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/core-service@${{ steps.build.outputs.digest }}
+        run: cosign sign --yes ${{ steps.image-vars.outputs.image_base }}/core-service@${{ steps.build.outputs.digest }}
 
   provenance-core:
     needs: build-core
@@ -104,12 +108,18 @@ jobs:
   build-ai:
     runs-on: ubuntu-latest
     outputs:
-      image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/ai-service
+      image: ${{ steps.image-vars.outputs.image_base }}/ai-service
       digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Set image namespace
+        id: image-vars
+        run: |
+          namespace="$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
+          echo "namespace=$namespace" >> "$GITHUB_OUTPUT"
+          echo "image_base=${{ env.REGISTRY }}/$namespace" >> "$GITHUB_OUTPUT"
       - name: Configure git safe directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: docker/setup-buildx-action@v3
@@ -129,14 +139,13 @@ jobs:
         uses: docker/metadata-action@v5
         if: ${{ github.actor != 'nektos/act' }}
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/ai-service
+          images: ${{ steps.image-vars.outputs.image_base }}/ai-service
           context: workflow
       - name: Set local image tags
         if: ${{ github.actor == 'nektos/act' }}
         id: meta-local
         run: |
-          namespace="$(echo "${{ env.IMAGE_NAMESPACE }}" | tr '[:upper:]' '[:lower:]')"
-          echo "tags=${{ env.REGISTRY }}/${namespace}/ai-service:local" >> "$GITHUB_OUTPUT"
+          echo "tags=${{ steps.image-vars.outputs.image_base }}/ai-service:local" >> "$GITHUB_OUTPUT"
           echo "labels=" >> "$GITHUB_OUTPUT"
       - name: Build and push
         id: build
@@ -145,14 +154,14 @@ jobs:
           context: ./src/services/ai-engine
           file: ./src/services/ai-engine/Dockerfile
           push: ${{ github.actor == 'nektos/act' && 'false' || 'true' }}
-          load: ${{ github.actor == 'nektos/act' && 'true' || 'false' }}
+          load: 'false'
           tags: ${{ github.actor == 'nektos/act' && steps.meta-local.outputs.tags || steps.meta.outputs.tags }}
           labels: ${{ github.actor == 'nektos/act' && steps.meta-local.outputs.labels || steps.meta.outputs.labels }}
       - name: Generate SBOM
         if: ${{ github.actor != 'nektos/act' }}
         uses: anchore/sbom-action@v0
         with:
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/ai-service@${{ steps.build.outputs.digest }}
+          image: ${{ steps.image-vars.outputs.image_base }}/ai-service@${{ steps.build.outputs.digest }}
           registry-username: ${{ github.actor }}
           registry-password: ${{ secrets.GITHUB_TOKEN }}
           format: spdx-json
@@ -170,7 +179,7 @@ jobs:
         if: ${{ github.actor != 'nektos/act' }}
         env:
           COSIGN_EXPERIMENTAL: "1"
-        run: cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/ai-service@${{ steps.build.outputs.digest }}
+        run: cosign sign --yes ${{ steps.image-vars.outputs.image_base }}/ai-service@${{ steps.build.outputs.digest }}
 
   provenance-ai:
     needs: build-ai
@@ -188,12 +197,18 @@ jobs:
   build-web:
     runs-on: ubuntu-latest
     outputs:
-      image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/web-service
+      image: ${{ steps.image-vars.outputs.image_base }}/web-service
       digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Set image namespace
+        id: image-vars
+        run: |
+          namespace="$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
+          echo "namespace=$namespace" >> "$GITHUB_OUTPUT"
+          echo "image_base=${{ env.REGISTRY }}/$namespace" >> "$GITHUB_OUTPUT"
       - name: Configure git safe directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: docker/setup-buildx-action@v3
@@ -213,14 +228,13 @@ jobs:
         uses: docker/metadata-action@v5
         if: ${{ github.actor != 'nektos/act' }}
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/web-service
+          images: ${{ steps.image-vars.outputs.image_base }}/web-service
           context: workflow
       - name: Set local image tags
         if: ${{ github.actor == 'nektos/act' }}
         id: meta-local
         run: |
-          namespace="$(echo "${{ env.IMAGE_NAMESPACE }}" | tr '[:upper:]' '[:lower:]')"
-          echo "tags=${{ env.REGISTRY }}/${namespace}/web-service:local" >> "$GITHUB_OUTPUT"
+          echo "tags=${{ steps.image-vars.outputs.image_base }}/web-service:local" >> "$GITHUB_OUTPUT"
           echo "labels=" >> "$GITHUB_OUTPUT"
       - name: Build and push
         id: build
@@ -236,7 +250,7 @@ jobs:
         if: ${{ github.actor != 'nektos/act' }}
         uses: anchore/sbom-action@v0
         with:
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/web-service@${{ steps.build.outputs.digest }}
+          image: ${{ steps.image-vars.outputs.image_base }}/web-service@${{ steps.build.outputs.digest }}
           registry-username: ${{ github.actor }}
           registry-password: ${{ secrets.GITHUB_TOKEN }}
           format: spdx-json
@@ -254,7 +268,7 @@ jobs:
         if: ${{ github.actor != 'nektos/act' }}
         env:
           COSIGN_EXPERIMENTAL: "1"
-        run: cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/web-service@${{ steps.build.outputs.digest }}
+        run: cosign sign --yes ${{ steps.image-vars.outputs.image_base }}/web-service@${{ steps.build.outputs.digest }}
 
   provenance-web:
     needs: build-web
@@ -272,12 +286,18 @@ jobs:
   build-agent:
     runs-on: ubuntu-latest
     outputs:
-      image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/agent-service
+      image: ${{ steps.image-vars.outputs.image_base }}/agent-service
       digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Set image namespace
+        id: image-vars
+        run: |
+          namespace="$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
+          echo "namespace=$namespace" >> "$GITHUB_OUTPUT"
+          echo "image_base=${{ env.REGISTRY }}/$namespace" >> "$GITHUB_OUTPUT"
       - name: Configure git safe directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: docker/setup-buildx-action@v3
@@ -297,14 +317,13 @@ jobs:
         uses: docker/metadata-action@v5
         if: ${{ github.actor != 'nektos/act' }}
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/agent-service
+          images: ${{ steps.image-vars.outputs.image_base }}/agent-service
           context: workflow
       - name: Set local image tags
         if: ${{ github.actor == 'nektos/act' }}
         id: meta-local
         run: |
-          namespace="$(echo "${{ env.IMAGE_NAMESPACE }}" | tr '[:upper:]' '[:lower:]')"
-          echo "tags=${{ env.REGISTRY }}/${namespace}/agent-service:local" >> "$GITHUB_OUTPUT"
+          echo "tags=${{ steps.image-vars.outputs.image_base }}/agent-service:local" >> "$GITHUB_OUTPUT"
           echo "labels=" >> "$GITHUB_OUTPUT"
       - name: Build and push
         id: build
@@ -320,7 +339,7 @@ jobs:
         if: ${{ github.actor != 'nektos/act' }}
         uses: anchore/sbom-action@v0
         with:
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/agent-service@${{ steps.build.outputs.digest }}
+          image: ${{ steps.image-vars.outputs.image_base }}/agent-service@${{ steps.build.outputs.digest }}
           registry-username: ${{ github.actor }}
           registry-password: ${{ secrets.GITHUB_TOKEN }}
           format: spdx-json
@@ -338,7 +357,7 @@ jobs:
         if: ${{ github.actor != 'nektos/act' }}
         env:
           COSIGN_EXPERIMENTAL: "1"
-        run: cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/agent-service@${{ steps.build.outputs.digest }}
+        run: cosign sign --yes ${{ steps.image-vars.outputs.image_base }}/agent-service@${{ steps.build.outputs.digest }}
 
   provenance-agent:
     needs: build-agent
