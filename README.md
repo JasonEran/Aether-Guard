@@ -60,7 +60,6 @@ This project targets a product-grade release, not a demo. The following standard
 
 ### Productization Gaps (v1.x)
 
-- Diagnostics bundle export available (API + dashboard).
 - No end-to-end auth on telemetry or artifacts; command API key only.
 - No schema registry or compatibility policy for MQ events.
 - Agent-side OpenTelemetry spans are not yet emitted (server-side spans/metrics are wired).
