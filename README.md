@@ -48,7 +48,7 @@ This project targets a product-grade release, not a demo. The following standard
 
 ## Current Implementation Snapshot (v1.x)
 
-- Agent (C++): REST/JSON telemetry; CRIU checkpointing with automatic simulation fallback.
+- Agent (C++): REST/JSON telemetry; CRIU checkpointing with automatic simulation fallback; optional OpenTelemetry spans for outbound requests.
 - Core API (.NET 8): REST controllers plus gRPC services with JSON transcoding; RabbitMQ ingestion worker with W3C trace context propagation; migration orchestration; PostgreSQL storage.
 - Protobuf contracts: shared schemas in src/shared/protos (AgentService + ControlPlane).
 - Agent handshake: registration accepts capability payloads and returns AgentConfig to drive feature gating.
@@ -62,7 +62,6 @@ This project targets a product-grade release, not a demo. The following standard
 ### Productization Gaps (v1.x)
 
 - No schema registry or formal compatibility policy for MQ events (only a lightweight schema-version envelope is in place).
-- Agent-side OpenTelemetry spans are not yet emitted (server-side spans/metrics are wired).
 - No EF Core migrations or formal upgrade path (production requires schema versioning + migrations).
 
 Code scan note: no TODO/FIXME markers found in the repo; the remaining gaps are architectural items listed above.
@@ -139,7 +138,7 @@ Code scan note: no TODO/FIXME markers found in the repo; the remaining gaps are 
 
 ## Services
 
-- agent-service: C++ telemetry agent with CRIU-based checkpointing (auto-falls back to simulation mode when CRIU is unavailable).
+- agent-service: C++ telemetry agent with CRIU-based checkpointing (auto-falls back to simulation mode when CRIU is unavailable) and optional OpenTelemetry spans.
 - core-service: ASP.NET Core API for ingestion, analysis, migration orchestration, and data access.
 - ai-service: FastAPI service for volatility-based risk scoring.
 - web-service: Next.js dashboard with authentication and visualization.
@@ -297,6 +296,12 @@ Telemetry schema policy (core-service):
 - TelemetrySchema__MinSupportedVersion=1
 - TelemetrySchema__MaxSupportedVersion=1
 - TelemetrySchema__OnUnsupported=drop
+
+Agent OpenTelemetry (agent-service):
+
+- AG_OTEL_ENABLED=true
+- AG_OTEL_ENDPOINT=http://otel-collector:4318/v1/traces
+- AG_OTEL_SERVICE_NAME=aether-guard-agent
 
 To keep local filesystem storage, set SnapshotStorage__Provider=Local (or remove the S3 settings).
 

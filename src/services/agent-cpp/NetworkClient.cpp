@@ -1,4 +1,5 @@
 #include "NetworkClient.hpp"
+#include "Tracing.hpp"
 
 #include <cpr/cpr.h>
 #include <cpr/ssl_options.h>
@@ -74,8 +75,8 @@ std::string BuildTraceParent() {
     return "00-" + RandomHex(16) + "-" + RandomHex(8) + "-01";
 }
 
-cpr::Header AddTraceParentHeader(cpr::Header headers) {
-    headers["traceparent"] = BuildTraceParent();
+cpr::Header AddTraceParentHeader(cpr::Header headers, const std::string& traceparent) {
+    headers["traceparent"] = traceparent.empty() ? BuildTraceParent() : traceparent;
     return headers;
 }
 
@@ -113,8 +114,12 @@ bool NetworkClient::Register(
         }}
     };
 
+    auto span = Tracer::Instance().StartSpan("agent.register");
+    Tracer::Instance().SetAttribute(span, "http.method", "POST");
+    Tracer::Instance().SetAttribute(span, "http.url", BuildUrl(baseUrl_, "/api/v1/agent/register"));
+
     cpr::Header headers{{"Content-Type", "application/json"}};
-    headers = AddTraceParentHeader(std::move(headers));
+    headers = AddTraceParentHeader(std::move(headers), span.traceparent);
     headers = AddApiKeyHeader(std::move(headers), apiKey_);
 
     cpr::Response response = tlsSettings_.enabled
@@ -128,12 +133,17 @@ bool NetworkClient::Register(
             cpr::Body{payload.dump()},
             headers);
 
-    if (response.error.code != cpr::ErrorCode::OK) {
+    const bool requestOk = response.error.code == cpr::ErrorCode::OK;
+    const bool statusOk = response.status_code == 200;
+    Tracer::Instance().SetAttribute(span, "http.status_code", response.status_code);
+    Tracer::Instance().EndSpan(span, requestOk && statusOk);
+
+    if (!requestOk) {
         std::cerr << "[Agent] register failed: " << response.error.message << std::endl;
         return false;
     }
 
-    if (response.status_code != 200) {
+    if (!statusOk) {
         std::cerr << "[Agent] register failed with HTTP " << response.status_code << std::endl;
         return false;
     }
@@ -174,14 +184,18 @@ bool NetworkClient::SendHeartbeat(
         payload["token"] = token;
     }
 
-    cpr::Header headers{{"Content-Type", "application/json"}};
-    if (!token.empty()) {
-        headers["Authorization"] = "Bearer " + token;
-    }
-    headers = AddTraceParentHeader(std::move(headers));
-    headers = AddApiKeyHeader(std::move(headers), apiKey_);
-
     for (int attempt = 0; attempt < kMaxRetries; ++attempt) {
+        auto span = Tracer::Instance().StartSpan("agent.heartbeat");
+        Tracer::Instance().SetAttribute(span, "http.method", "POST");
+        Tracer::Instance().SetAttribute(span, "http.url", BuildUrl(baseUrl_, "/api/v1/agent/heartbeat"));
+        Tracer::Instance().SetAttribute(span, "retry.attempt", static_cast<int64_t>(attempt + 1));
+        cpr::Header headers{{"Content-Type", "application/json"}};
+        if (!token.empty()) {
+            headers["Authorization"] = "Bearer " + token;
+        }
+        headers = AddTraceParentHeader(std::move(headers), span.traceparent);
+        headers = AddApiKeyHeader(std::move(headers), apiKey_);
+
         cpr::Response response = tlsSettings_.enabled
             ? cpr::Post(
                 cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/heartbeat")},
@@ -199,6 +213,9 @@ bool NetworkClient::SendHeartbeat(
 
         const bool requestOk = response.error.code == cpr::ErrorCode::OK;
         const bool statusOk = IsSuccessStatus(response);
+        Tracer::Instance().SetAttribute(span, "http.status_code", response.status_code);
+        Tracer::Instance().EndSpan(span, requestOk && statusOk);
+
         if (requestOk && statusOk) {
             auto json = nlohmann::json::parse(response.text, nullptr, false);
             if (!json.is_discarded() && json.contains("commands") && json["commands"].is_array()) {
@@ -238,7 +255,11 @@ bool NetworkClient::PollCommands(const std::string& agentId, std::vector<Command
         return false;
     }
 
-    cpr::Header headers = AddApiKeyHeader(AddTraceParentHeader(cpr::Header{}), apiKey_);
+    auto span = Tracer::Instance().StartSpan("agent.poll");
+    Tracer::Instance().SetAttribute(span, "http.method", "GET");
+    Tracer::Instance().SetAttribute(span, "http.url", BuildUrl(baseUrl_, "/api/v1/agent/poll"));
+
+    cpr::Header headers = AddApiKeyHeader(AddTraceParentHeader(cpr::Header{}, span.traceparent), apiKey_);
     cpr::Response response = tlsSettings_.enabled
         ? cpr::Get(
             cpr::Url{BuildUrl(baseUrl_, "/api/v1/agent/poll")},
@@ -250,12 +271,17 @@ bool NetworkClient::PollCommands(const std::string& agentId, std::vector<Command
             cpr::Parameters{{"agentId", agentId}},
             headers);
 
-    if (response.error.code != cpr::ErrorCode::OK) {
+    const bool requestOk = response.error.code == cpr::ErrorCode::OK;
+    const bool statusOk = response.status_code < 400;
+    Tracer::Instance().SetAttribute(span, "http.status_code", response.status_code);
+    Tracer::Instance().EndSpan(span, requestOk && statusOk);
+
+    if (!requestOk) {
         std::cerr << "[Agent] poll failed: " << response.error.message << std::endl;
         return false;
     }
 
-    if (response.status_code >= 400) {
+    if (!statusOk) {
         std::cerr << "[Agent] poll failed with HTTP " << response.status_code << std::endl;
         return false;
     }
@@ -299,8 +325,12 @@ bool NetworkClient::SendFeedback(const std::string& agentId, const CommandFeedba
         {"error", feedback.error}
     };
 
+    auto span = Tracer::Instance().StartSpan("agent.feedback");
+    Tracer::Instance().SetAttribute(span, "http.method", "POST");
+    Tracer::Instance().SetAttribute(span, "http.url", BuildUrl(baseUrl_, "/api/v1/agent/feedback"));
+
     cpr::Header headers{{"Content-Type", "application/json"}};
-    headers = AddTraceParentHeader(std::move(headers));
+    headers = AddTraceParentHeader(std::move(headers), span.traceparent);
     headers = AddApiKeyHeader(std::move(headers), apiKey_);
 
     cpr::Response response = tlsSettings_.enabled
@@ -314,12 +344,17 @@ bool NetworkClient::SendFeedback(const std::string& agentId, const CommandFeedba
             cpr::Body{payload.dump()},
             headers);
 
-    if (response.error.code != cpr::ErrorCode::OK) {
+    const bool requestOk = response.error.code == cpr::ErrorCode::OK;
+    const bool statusOk = response.status_code < 400;
+    Tracer::Instance().SetAttribute(span, "http.status_code", response.status_code);
+    Tracer::Instance().EndSpan(span, requestOk && statusOk);
+
+    if (!requestOk) {
         std::cerr << "[Agent] feedback failed: " << response.error.message << std::endl;
         return false;
     }
 
-    if (response.status_code >= 400) {
+    if (!statusOk) {
         std::cerr << "[Agent] feedback failed with HTTP " << response.status_code << std::endl;
         return false;
     }
@@ -338,7 +373,12 @@ bool NetworkClient::UploadSnapshot(const std::string& url, const std::string& fi
     }
 
     for (int attempt = 0; attempt < kMaxRetries; ++attempt) {
-        cpr::Header headers = AddApiKeyHeader(AddTraceParentHeader(cpr::Header{}), apiKey_);
+        auto span = Tracer::Instance().StartSpan("agent.snapshot.upload");
+        Tracer::Instance().SetAttribute(span, "http.method", "POST");
+        Tracer::Instance().SetAttribute(span, "http.url", url);
+        Tracer::Instance().SetAttribute(span, "retry.attempt", static_cast<int64_t>(attempt + 1));
+
+        cpr::Header headers = AddApiKeyHeader(AddTraceParentHeader(cpr::Header{}, span.traceparent), apiKey_);
         cpr::Response response = tlsSettings_.enabled
             ? cpr::Post(
                 cpr::Url{url},
@@ -356,6 +396,9 @@ bool NetworkClient::UploadSnapshot(const std::string& url, const std::string& fi
 
         const bool requestOk = response.error.code == cpr::ErrorCode::OK;
         const bool statusOk = IsSuccessStatus(response);
+        Tracer::Instance().SetAttribute(span, "http.status_code", response.status_code);
+        Tracer::Instance().EndSpan(span, requestOk && statusOk);
+
         if (requestOk && statusOk) {
             return true;
         }
@@ -392,17 +435,26 @@ bool NetworkClient::DownloadSnapshot(const std::string& url, const std::string& 
         }
     }
 
-    cpr::Header headers = AddApiKeyHeader(AddTraceParentHeader(cpr::Header{}), apiKey_);
+    auto span = Tracer::Instance().StartSpan("agent.snapshot.download");
+    Tracer::Instance().SetAttribute(span, "http.method", "GET");
+    Tracer::Instance().SetAttribute(span, "http.url", url);
+
+    cpr::Header headers = AddApiKeyHeader(AddTraceParentHeader(cpr::Header{}, span.traceparent), apiKey_);
     cpr::Response response = tlsSettings_.enabled
         ? cpr::Get(cpr::Url{url}, headers, BuildSslOptions(tlsSettings_))
         : cpr::Get(cpr::Url{url}, headers);
 
-    if (response.error.code != cpr::ErrorCode::OK) {
+    const bool requestOk = response.error.code == cpr::ErrorCode::OK;
+    const bool statusOk = response.status_code < 400;
+    Tracer::Instance().SetAttribute(span, "http.status_code", response.status_code);
+    Tracer::Instance().EndSpan(span, requestOk && statusOk);
+
+    if (!requestOk) {
         std::cerr << "[Agent] download failed: " << response.error.message << std::endl;
         return false;
     }
 
-    if (response.status_code >= 400) {
+    if (!statusOk) {
         std::cerr << "[Agent] download failed with HTTP " << response.status_code << std::endl;
         return false;
     }

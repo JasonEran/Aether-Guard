@@ -1,6 +1,7 @@
 #include "CommandPoller.hpp"
 #include "LifecycleManager.hpp"
 #include "NetworkClient.hpp"
+#include "Tracing.hpp"
 
 #include <chrono>
 #include <cstdlib>
@@ -130,6 +131,13 @@ int main() {
     std::cout << "Aether Agent Starting..." << std::endl;
 
     const std::string coreUrl = GetEnvOrDefault("AG_CORE_URL", "http://core-service:8080");
+    TraceConfig traceConfig;
+    traceConfig.enabled = GetEnvBool("AG_OTEL_ENABLED", false);
+    traceConfig.endpoint = GetEnvOrDefault("AG_OTEL_ENDPOINT", "http://otel-collector:4318/v1/traces");
+    traceConfig.serviceName = GetEnvOrDefault("AG_OTEL_SERVICE_NAME", "aether-guard-agent");
+    Tracer::Instance().Configure(traceConfig);
+    std::atexit([]() { Tracer::Instance().Shutdown(); });
+
     TlsSettings tlsSettings;
     tlsSettings.enabled = GetEnvBool("AG_MTLS_ENABLED", false);
     if (tlsSettings.enabled) {

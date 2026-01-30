@@ -10,6 +10,7 @@ include(FetchContent)
 option(AETHER_ENABLE_GRPC "Build gRPC stubs for agent protos." ON)
 option(AETHER_USE_LOCAL_PROTOBUF "Use third_party/protobuf when available." ON)
 option(AETHER_GRPC_USE_ARCHIVE "Use gRPC release archive (no submodules)." OFF)
+option(AETHER_ENABLE_OTEL "Enable OpenTelemetry spans for the agent." OFF)
 
 # CMake < 3.24 doesn't understand DOWNLOAD_EXTRACT_TIMESTAMP, which breaks ExternalProject.
 set(_AETHER_FC_EXTRACT_TIMESTAMP)
@@ -41,6 +42,22 @@ FetchContent_Declare(
     URL_HASH SHA256=faf4f8340eafcb5834202c8dc43d8f0bcbd193fb810b05dc4502d4c67ea4d11d
     ${_AETHER_FC_EXTRACT_TIMESTAMP}
 )
+
+if(AETHER_ENABLE_OTEL)
+    set(WITH_OTLP_HTTP ON CACHE BOOL "" FORCE)
+    set(WITH_OTLP_GRPC OFF CACHE BOOL "" FORCE)
+    set(WITH_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(WITH_TESTS OFF CACHE BOOL "" FORCE)
+    set(WITH_BENCHMARK OFF CACHE BOOL "" FORCE)
+    set(WITH_ABSEIL OFF CACHE BOOL "" FORCE)
+
+    FetchContent_Declare(
+        opentelemetry_cpp
+        GIT_REPOSITORY https://github.com/open-telemetry/opentelemetry-cpp.git
+        GIT_TAG v1.16.1
+        GIT_SHALLOW TRUE
+    )
+endif()
 
 if(AETHER_ENABLE_GRPC)
     set(gRPC_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -82,7 +99,11 @@ set(protobuf_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(protobuf_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
 if(AETHER_ENABLE_GRPC)
-    FetchContent_MakeAvailable(nlohmann_json cpr grpc)
+    if(AETHER_ENABLE_OTEL)
+        FetchContent_MakeAvailable(nlohmann_json cpr grpc opentelemetry_cpp)
+    else()
+        FetchContent_MakeAvailable(nlohmann_json cpr grpc)
+    endif()
 else()
     set(_LOCAL_PROTOBUF_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../third_party/protobuf)
     if(AETHER_USE_LOCAL_PROTOBUF AND EXISTS ${_LOCAL_PROTOBUF_DIR}/CMakeLists.txt)
@@ -98,7 +119,11 @@ else()
             GIT_SHALLOW TRUE
         )
     endif()
-    FetchContent_MakeAvailable(nlohmann_json cpr protobuf)
+    if(AETHER_ENABLE_OTEL)
+        FetchContent_MakeAvailable(nlohmann_json cpr protobuf opentelemetry_cpp)
+    else()
+        FetchContent_MakeAvailable(nlohmann_json cpr protobuf)
+    endif()
 endif()
 
 if(AETHER_ENABLE_GRPC)
@@ -231,6 +256,7 @@ add_executable(AetherAgent
     main.cpp
     LifecycleManager.cpp
     NetworkClient.cpp
+    Tracing.cpp
 )
 
 target_link_libraries(AetherAgent
@@ -238,6 +264,35 @@ target_link_libraries(AetherAgent
     nlohmann_json::nlohmann_json
     aether_proto
 )
+
+target_compile_definitions(AetherAgent
+    PRIVATE
+    $<$<BOOL:${AETHER_ENABLE_OTEL}>:AETHER_ENABLE_OTEL=1>
+)
+
+if(AETHER_ENABLE_OTEL)
+    set(_AETHER_OTEL_TARGETS
+        opentelemetry::trace
+        opentelemetry::sdk
+        opentelemetry::resources
+        opentelemetry::otlp_http_exporter
+        opentelemetry_trace
+        opentelemetry_sdk
+        opentelemetry_resources
+        opentelemetry_exporter_otlp_http
+    )
+    set(_AETHER_OTEL_LIBS "")
+    foreach(_target IN LISTS _AETHER_OTEL_TARGETS)
+        if(TARGET ${_target})
+            list(APPEND _AETHER_OTEL_LIBS ${_target})
+        endif()
+    endforeach()
+    if(_AETHER_OTEL_LIBS)
+        target_link_libraries(AetherAgent ${_AETHER_OTEL_LIBS})
+    else()
+        message(FATAL_ERROR "AETHER_ENABLE_OTEL is ON but OpenTelemetry targets were not found.")
+    endif()
+endif()
 
 enable_testing()
 
