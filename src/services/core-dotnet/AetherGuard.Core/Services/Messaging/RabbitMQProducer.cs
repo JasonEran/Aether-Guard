@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using AetherGuard.Core.Models;
 using Microsoft.Extensions.Configuration;
 using RabbitMQ.Client;
 
@@ -11,6 +12,8 @@ public sealed class RabbitMQProducer : IMessageProducer, IDisposable
     private const string QueueName = "telemetry_data";
     private const string TraceParentHeader = "traceparent";
     private const string TraceStateHeader = "tracestate";
+    private const string SchemaVersionHeader = "schema_version";
+    private const int CurrentSchemaVersion = 1;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -61,7 +64,14 @@ public sealed class RabbitMQProducer : IMessageProducer, IDisposable
 
     public void SendMessage<T>(T message)
     {
-        var payload = JsonSerializer.Serialize(message, JsonOptions);
+        var now = DateTimeOffset.UtcNow;
+        var payload = JsonSerializer.Serialize(
+            new TelemetryEnvelope(
+                SchemaVersion: CurrentSchemaVersion,
+                SentAt: now.ToUnixTimeSeconds(),
+                Payload: (message as TelemetryPayload)
+                         ?? throw new InvalidOperationException("Telemetry payload is required.")),
+            JsonOptions);
         var body = Encoding.UTF8.GetBytes(payload);
 
         var properties = new BasicProperties
@@ -70,6 +80,7 @@ public sealed class RabbitMQProducer : IMessageProducer, IDisposable
         };
 
         InjectTraceContext(properties);
+        InjectSchemaVersion(properties);
 
         lock (_lock)
         {
@@ -99,6 +110,12 @@ public sealed class RabbitMQProducer : IMessageProducer, IDisposable
         {
             properties.Headers[TraceStateHeader] = Encoding.UTF8.GetBytes(current.TraceStateString);
         }
+    }
+
+    private static void InjectSchemaVersion(IBasicProperties properties)
+    {
+        properties.Headers ??= new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        properties.Headers[SchemaVersionHeader] = CurrentSchemaVersion;
     }
 
     private static string BuildTraceParent(ActivityContext context)

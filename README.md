@@ -56,11 +56,12 @@ This project targets a product-grade release, not a demo. The following standard
 - Dashboard (Next.js): telemetry and command visibility with NextAuth credentials.
 - Storage: snapshots stored on local filesystem by default; optional S3/MinIO backend with retention sweeper and S3 lifecycle support.
 - Security: API key for command endpoints; SPIRE mTLS for agent/core; OpenTelemetry baseline across core/AI/dashboard.
+- Messaging: telemetry queue payloads are wrapped in a schema-versioned envelope (v1).
 - Supply chain: SBOM generation, cosign signing, and SLSA provenance in CI.
 
 ### Productization Gaps (v1.x)
 
-- No schema registry or compatibility policy for MQ events.
+- No schema registry or formal compatibility policy for MQ events (only a lightweight schema-version envelope is in place).
 - Agent-side OpenTelemetry spans are not yet emitted (server-side spans/metrics are wired).
 - No EF Core migrations or formal upgrade path (production requires schema versioning + migrations).
 

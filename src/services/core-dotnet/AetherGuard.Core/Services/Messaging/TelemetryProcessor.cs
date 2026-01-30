@@ -17,6 +17,9 @@ public sealed class TelemetryProcessor : BackgroundService
     private const string QueueName = "telemetry_data";
     private const string TraceParentHeader = "traceparent";
     private const string TraceStateHeader = "tracestate";
+    private const string SchemaVersionHeader = "schema_version";
+    private const int CurrentSchemaVersion = 1;
+    private const int MinSupportedSchemaVersion = 1;
     private static readonly ActivitySource ActivitySource = new("AetherGuard.Core.Messaging");
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -91,7 +94,15 @@ public sealed class TelemetryProcessor : BackgroundService
                 activity?.SetTag("messaging.destination", QueueName);
 
                 var body = Encoding.UTF8.GetString(ea.Body.Span);
-                var payload = JsonSerializer.Deserialize<TelemetryPayload>(body, JsonOptions);
+                if (!TryDeserializePayload(body, ea.BasicProperties?.Headers, out var payload, out var schemaVersion))
+                {
+                    _logger.LogWarning("Dropped telemetry message with unsupported schema.");
+                    activity?.SetTag("telemetry.schema.version", schemaVersion);
+                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: CancellationToken.None);
+                    return;
+                }
+
+                activity?.SetTag("telemetry.schema.version", schemaVersion);
 
                 if (payload is null)
                 {
@@ -195,4 +206,66 @@ public sealed class TelemetryProcessor : BackgroundService
                 return false;
         }
     }
+
+    private static bool TryDeserializePayload(
+        string body,
+        IDictionary<string, object?>? headers,
+        out TelemetryPayload? payload,
+        out int schemaVersion)
+    {
+        payload = null;
+        schemaVersion = ResolveSchemaVersion(headers);
+
+        if (!IsSchemaSupported(schemaVersion))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            if (document.RootElement.ValueKind == JsonValueKind.Object
+                && document.RootElement.TryGetProperty("payload", out var payloadElement))
+            {
+                var envelope = JsonSerializer.Deserialize<TelemetryEnvelope>(body, JsonOptions);
+                if (envelope is null || !IsSchemaSupported(envelope.SchemaVersion))
+                {
+                    schemaVersion = envelope?.SchemaVersion ?? schemaVersion;
+                    return false;
+                }
+
+                payload = envelope.Payload;
+                schemaVersion = envelope.SchemaVersion;
+                return true;
+            }
+
+            payload = JsonSerializer.Deserialize<TelemetryPayload>(body, JsonOptions);
+            return payload is not null;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static int ResolveSchemaVersion(IDictionary<string, object?>? headers)
+    {
+        if (headers is null || !headers.TryGetValue(SchemaVersionHeader, out var raw) || raw is null)
+        {
+            return CurrentSchemaVersion;
+        }
+
+        return raw switch
+        {
+            byte[] bytes when int.TryParse(Encoding.UTF8.GetString(bytes), out var value) => value,
+            ReadOnlyMemory<byte> memory when int.TryParse(Encoding.UTF8.GetString(memory.Span), out var value) => value,
+            string str when int.TryParse(str, out var value) => value,
+            int value => value,
+            long value => (int)value,
+            _ => CurrentSchemaVersion
+        };
+    }
+
+    private static bool IsSchemaSupported(int version)
+        => version >= MinSupportedSchemaVersion && version <= CurrentSchemaVersion;
 }
