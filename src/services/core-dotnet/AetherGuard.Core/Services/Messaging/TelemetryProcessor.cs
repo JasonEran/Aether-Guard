@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using System.Linq;
 using AetherGuard.Core.Data;
 using AetherGuard.Core.Models;
 using AetherGuard.Core.Services;
@@ -18,8 +19,7 @@ public sealed class TelemetryProcessor : BackgroundService
     private const string TraceParentHeader = "traceparent";
     private const string TraceStateHeader = "tracestate";
     private const string SchemaVersionHeader = "schema_version";
-    private const int CurrentSchemaVersion = 1;
-    private const int MinSupportedSchemaVersion = 1;
+    private static readonly string[] RequeueKeywords = ["requeue", "retry"];
     private static readonly ActivitySource ActivitySource = new("AetherGuard.Core.Messaging");
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -30,11 +30,14 @@ public sealed class TelemetryProcessor : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly IConnection _connection;
     private readonly IChannel _channel;
+    private readonly TelemetrySchemaOptions _schemaOptions;
 
     public TelemetryProcessor(IConfiguration configuration, IServiceProvider serviceProvider, ILogger<TelemetryProcessor> logger)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
+        _schemaOptions = configuration.GetSection("TelemetrySchema").Get<TelemetrySchemaOptions>()
+            ?? new TelemetrySchemaOptions();
 
         var section = configuration.GetSection("RabbitMq");
         var host = section["Host"] ?? "localhost";
@@ -98,7 +101,7 @@ public sealed class TelemetryProcessor : BackgroundService
                 {
                     _logger.LogWarning("Dropped telemetry message with unsupported schema.");
                     activity?.SetTag("telemetry.schema.version", schemaVersion);
-                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: CancellationToken.None);
+                    await HandleUnsupportedSchemaAsync(ea.DeliveryTag, stoppingToken);
                     return;
                 }
 
@@ -207,7 +210,7 @@ public sealed class TelemetryProcessor : BackgroundService
         }
     }
 
-    private static bool TryDeserializePayload(
+    private bool TryDeserializePayload(
         string body,
         IDictionary<string, object?>? headers,
         out TelemetryPayload? payload,
@@ -248,11 +251,11 @@ public sealed class TelemetryProcessor : BackgroundService
         }
     }
 
-    private static int ResolveSchemaVersion(IDictionary<string, object?>? headers)
+    private int ResolveSchemaVersion(IDictionary<string, object?>? headers)
     {
         if (headers is null || !headers.TryGetValue(SchemaVersionHeader, out var raw) || raw is null)
         {
-            return CurrentSchemaVersion;
+            return _schemaOptions.CurrentVersion;
         }
 
         return raw switch
@@ -262,10 +265,36 @@ public sealed class TelemetryProcessor : BackgroundService
             string str when int.TryParse(str, out var value) => value,
             int value => value,
             long value => (int)value,
-            _ => CurrentSchemaVersion
+            _ => _schemaOptions.CurrentVersion
         };
     }
 
-    private static bool IsSchemaSupported(int version)
-        => version >= MinSupportedSchemaVersion && version <= CurrentSchemaVersion;
+    private bool IsSchemaSupported(int version)
+        => version >= _schemaOptions.MinSupportedVersion && version <= _schemaOptions.MaxSupportedVersion;
+
+    private async Task HandleUnsupportedSchemaAsync(ulong deliveryTag, CancellationToken cancellationToken)
+    {
+        if (ShouldRequeueUnsupported())
+        {
+            await _channel.BasicNackAsync(
+                deliveryTag,
+                multiple: false,
+                requeue: true,
+                cancellationToken: cancellationToken);
+            return;
+        }
+
+        await _channel.BasicAckAsync(deliveryTag, multiple: false, cancellationToken: cancellationToken);
+    }
+
+    private bool ShouldRequeueUnsupported()
+    {
+        if (string.IsNullOrWhiteSpace(_schemaOptions.OnUnsupported))
+        {
+            return false;
+        }
+
+        return RequeueKeywords.Any(keyword =>
+            _schemaOptions.OnUnsupported.Trim().Contains(keyword, StringComparison.OrdinalIgnoreCase));
+    }
 }

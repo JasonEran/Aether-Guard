@@ -13,7 +13,6 @@ public sealed class RabbitMQProducer : IMessageProducer, IDisposable
     private const string TraceParentHeader = "traceparent";
     private const string TraceStateHeader = "tracestate";
     private const string SchemaVersionHeader = "schema_version";
-    private const int CurrentSchemaVersion = 1;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -22,9 +21,13 @@ public sealed class RabbitMQProducer : IMessageProducer, IDisposable
     private readonly IConnection _connection;
     private readonly IChannel _channel;
     private readonly object _lock = new();
+    private readonly TelemetrySchemaOptions _schemaOptions;
 
     public RabbitMQProducer(IConfiguration configuration)
     {
+        _schemaOptions = configuration.GetSection("TelemetrySchema").Get<TelemetrySchemaOptions>()
+            ?? new TelemetrySchemaOptions();
+
         var section = configuration.GetSection("RabbitMq");
         var host = section["Host"] ?? "localhost";
         var user = section["User"] ?? "guest";
@@ -67,7 +70,7 @@ public sealed class RabbitMQProducer : IMessageProducer, IDisposable
         var now = DateTimeOffset.UtcNow;
         var payload = JsonSerializer.Serialize(
             new TelemetryEnvelope(
-                SchemaVersion: CurrentSchemaVersion,
+                SchemaVersion: _schemaOptions.CurrentVersion,
                 SentAt: now.ToUnixTimeSeconds(),
                 Payload: (message as TelemetryPayload)
                          ?? throw new InvalidOperationException("Telemetry payload is required.")),
@@ -112,10 +115,10 @@ public sealed class RabbitMQProducer : IMessageProducer, IDisposable
         }
     }
 
-    private static void InjectSchemaVersion(IBasicProperties properties)
+    private void InjectSchemaVersion(IBasicProperties properties)
     {
         properties.Headers ??= new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        properties.Headers[SchemaVersionHeader] = CurrentSchemaVersion;
+        properties.Headers[SchemaVersionHeader] = _schemaOptions.CurrentVersion;
     }
 
     private static string BuildTraceParent(ActivityContext context)

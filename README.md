@@ -291,6 +291,13 @@ Spot price history (core-service):
 - SpotPriceHistory__2=0.99
 - SpotPriceHistory__3=1.0
 
+Telemetry schema policy (core-service):
+
+- TelemetrySchema__CurrentVersion=1
+- TelemetrySchema__MinSupportedVersion=1
+- TelemetrySchema__MaxSupportedVersion=1
+- TelemetrySchema__OnUnsupported=drop
+
 To keep local filesystem storage, set SnapshotStorage__Provider=Local (or remove the S3 settings).
 
 Snapshot retention (core-service):
