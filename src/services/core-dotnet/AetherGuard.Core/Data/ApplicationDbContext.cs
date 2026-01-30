@@ -14,6 +14,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<AgentCommand> AgentCommands => Set<AgentCommand>();
     public DbSet<CommandAudit> CommandAudits => Set<CommandAudit>();
     public DbSet<TelemetryRecord> TelemetryRecords => Set<TelemetryRecord>();
+    public DbSet<SchemaRegistryEntry> SchemaRegistryEntries => Set<SchemaRegistryEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -72,6 +73,18 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Action).HasColumnName("action");
             entity.Property(e => e.Result).HasColumnName("result");
             entity.Property(e => e.Error).HasColumnName("error");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+        });
+
+        modelBuilder.Entity<SchemaRegistryEntry>(entity =>
+        {
+            entity.ToTable("schema_registry");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.Subject, e.Version }).IsUnique();
+            entity.Property(e => e.Id).HasColumnName("id").ValueGeneratedOnAdd();
+            entity.Property(e => e.Subject).HasColumnName("subject");
+            entity.Property(e => e.Version).HasColumnName("version");
+            entity.Property(e => e.Schema).HasColumnName("schema");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
         });
     }

@@ -11,6 +11,7 @@
     <PackageReference Include="Google.Api.CommonProtos" Version="2.17.0" />
     <PackageReference Include="Google.Protobuf" Version="3.31.1" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.62.0" />
+    <PackageReference Include="JsonSchema.Net" Version="8.0.5" />
     <PackageReference Include="Microsoft.AspNetCore.Grpc.JsonTranscoding" Version="8.0.23" />
     <PackageReference Include="Grpc.Tools" Version="2.62.0" PrivateAssets="All" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.23" />
@@ -32,15 +33,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Protobuf Include="..\..\..\shared\protos\common.proto"
-              GrpcServices="None"
-              AdditionalImportDirs="..\..\..\shared\protos" />
-    <Protobuf Include="..\..\..\shared\protos\agent_service.proto"
-              GrpcServices="Server"
-              AdditionalImportDirs="..\..\..\shared\protos" />
-    <Protobuf Include="..\..\..\shared\protos\control_plane.proto"
-              GrpcServices="Server"
-              AdditionalImportDirs="..\..\..\shared\protos" />
+    <Protobuf Include="..\..\..\shared\protos\common.proto" GrpcServices="None" AdditionalImportDirs="..\..\..\shared\protos" />
+    <Protobuf Include="..\..\..\shared\protos\agent_service.proto" GrpcServices="Server" AdditionalImportDirs="..\..\..\shared\protos" />
+    <Protobuf Include="..\..\..\shared\protos\control_plane.proto" GrpcServices="Server" AdditionalImportDirs="..\..\..\shared\protos" />
   </ItemGroup>
 
 </Project>

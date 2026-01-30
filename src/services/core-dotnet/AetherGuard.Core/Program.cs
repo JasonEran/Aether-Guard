@@ -62,6 +62,8 @@ builder.Services.AddSingleton<IMessageProducer, RabbitMQProducer>();
 builder.Services.AddHostedService<TelemetryProcessor>();
 builder.Services.AddHostedService<MigrationCycleService>();
 builder.Services.AddHostedService<SnapshotRetentionService>();
+builder.Services.AddSingleton<AetherGuard.Core.Services.SchemaRegistry.SchemaRegistryService>();
+builder.Services.AddHostedService<AetherGuard.Core.Services.SchemaRegistry.SchemaRegistrySeeder>();
 
 var otelOptions = builder.Configuration.GetSection("OpenTelemetry").Get<OpenTelemetryOptions>()
     ?? new OpenTelemetryOptions();
@@ -120,6 +122,7 @@ if (string.IsNullOrWhiteSpace(redisConnection))
 }
 
 builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseNpgsql(connectionString));
+builder.Services.AddDbContextFactory<ApplicationDbContext>(options => options.UseNpgsql(connectionString));
 builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnection));
 
 builder.Services.AddCors(options =>

@@ -18,7 +18,7 @@ v2.2 reference architecture with a concrete implementation guide.
 
 ## Project Status
 
-- Stage: v2.2 baseline delivered (Phase 0-4). Remaining productization gaps tracked below.
+- Stage: v2.2 baseline delivered (Phase 0-4). Remaining productization gaps tracked below (currently none).
 - License: MIT
 - Authors: Qi Junyi, Xiao Erdong (2026)
 
@@ -56,15 +56,13 @@ This project targets a product-grade release, not a demo. The following standard
 - Dashboard (Next.js): telemetry and command visibility with NextAuth credentials.
 - Storage: snapshots stored on local filesystem by default; optional S3/MinIO backend with retention sweeper and S3 lifecycle support.
 - Security: API key for command endpoints; SPIRE mTLS for agent/core; OpenTelemetry baseline across core/AI/dashboard.
-- Messaging: telemetry queue payloads are wrapped in a schema-versioned envelope (v1).
+- Messaging: telemetry queue payloads are wrapped in a schema-versioned envelope (v1) with DLQ routing and prefetch backpressure.
+- Schema registry: telemetry envelope and payload schemas are registered in Postgres and validated at ingest.
 - Supply chain: SBOM generation, cosign signing, and SLSA provenance in CI.
 
 ### Productization Gaps (v1.x)
 
-- No schema registry or formal compatibility policy for MQ events (only a lightweight schema-version envelope is in place).
-- No EF Core migrations or formal upgrade path (production requires schema versioning + migrations).
-
-Code scan note: no TODO/FIXME markers found in the repo; the remaining gaps are architectural items listed above.
+- None for the v2.2 baseline in this repo. Remaining enhancements are tracked via issues/roadmap.
 
 ## v2.2 Reference Architecture
 
@@ -297,6 +295,20 @@ Telemetry schema policy (core-service):
 - TelemetrySchema__MaxSupportedVersion=1
 - TelemetrySchema__OnUnsupported=drop
 
+Telemetry queue options (core-service):
+
+- TelemetryQueue__QueueName=telemetry_data
+- TelemetryQueue__EnableDeadLettering=true
+- TelemetryQueue__DeadLetterExchange=telemetry_dlx
+- TelemetryQueue__DeadLetterQueueName=telemetry_data.dlq
+- TelemetryQueue__DeadLetterRoutingKey=telemetry_data.dlq
+- TelemetryQueue__PrefetchCount=50
+
+Schema registry (core-service):
+
+- SchemaRegistry__Enabled=true
+- SchemaRegistry__Compatibility=BACKWARD
+
 Agent OpenTelemetry (agent-service):
 
 - AG_OTEL_ENABLED=true
@@ -412,9 +424,23 @@ TelemetryRecord persisted to PostgreSQL:
 - PredictedCpu
 - Timestamp (UTC)
 
-For production, add EF Core migrations and a formal upgrade process.
+EF Core migrations are included; use them as the basis for upgrade and rollback workflows.
 
 ## Development
+
+### Database Migrations
+
+Generate or update migrations:
+
+```bash
+dotnet tool run dotnet-ef migrations add InitialCreate \
+  --project src/services/core-dotnet/AetherGuard.Core/AetherGuard.Core.csproj \
+  --startup-project src/services/core-dotnet/AetherGuard.Core/AetherGuard.Core.csproj \
+  --context ApplicationDbContext \
+  --output-dir Data/Migrations
+```
+
+Use `AG_DB_CONNECTION` to override the connection string during migration generation.
 
 Dashboard:
 

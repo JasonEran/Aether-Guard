@@ -3,13 +3,14 @@ using System.Text;
 using System.Text.Json;
 using AetherGuard.Core.Models;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
+using RabbitMQ.Client.Exceptions;
 
 namespace AetherGuard.Core.Services.Messaging;
 
 public sealed class RabbitMQProducer : IMessageProducer, IDisposable
 {
-    private const string QueueName = "telemetry_data";
     private const string TraceParentHeader = "traceparent";
     private const string TraceStateHeader = "tracestate";
     private const string SchemaVersionHeader = "schema_version";
@@ -18,15 +19,20 @@ public sealed class RabbitMQProducer : IMessageProducer, IDisposable
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
+    private readonly ILogger<RabbitMQProducer> _logger;
     private readonly IConnection _connection;
     private readonly IChannel _channel;
     private readonly object _lock = new();
     private readonly TelemetrySchemaOptions _schemaOptions;
+    private readonly TelemetryQueueOptions _queueOptions;
 
-    public RabbitMQProducer(IConfiguration configuration)
+    public RabbitMQProducer(IConfiguration configuration, ILogger<RabbitMQProducer> logger)
     {
+        _logger = logger;
         _schemaOptions = configuration.GetSection("TelemetrySchema").Get<TelemetrySchemaOptions>()
             ?? new TelemetrySchemaOptions();
+        _queueOptions = configuration.GetSection("TelemetryQueue").Get<TelemetryQueueOptions>()
+            ?? new TelemetryQueueOptions();
 
         var section = configuration.GetSection("RabbitMq");
         var host = section["Host"] ?? "localhost";
@@ -55,14 +61,7 @@ public sealed class RabbitMQProducer : IMessageProducer, IDisposable
             .GetAwaiter()
             .GetResult();
 
-        _channel.QueueDeclareAsync(
-            queue: QueueName,
-            durable: true,
-            exclusive: false,
-            autoDelete: false,
-            arguments: null,
-            noWait: false,
-            cancellationToken: CancellationToken.None).GetAwaiter().GetResult();
+        ConfigureTelemetryQueueAsync().GetAwaiter().GetResult();
     }
 
     public void SendMessage<T>(T message)
@@ -89,7 +88,7 @@ public sealed class RabbitMQProducer : IMessageProducer, IDisposable
         {
             _channel.BasicPublishAsync(
                 exchange: "",
-                routingKey: QueueName,
+                routingKey: _queueOptions.QueueName,
                 mandatory: false,
                 basicProperties: properties,
                 body: body,
@@ -125,6 +124,66 @@ public sealed class RabbitMQProducer : IMessageProducer, IDisposable
     {
         var flags = context.TraceFlags.HasFlag(ActivityTraceFlags.Recorded) ? "01" : "00";
         return $"00-{context.TraceId.ToHexString()}-{context.SpanId.ToHexString()}-{flags}";
+    }
+
+    private async Task ConfigureTelemetryQueueAsync()
+    {
+        IDictionary<string, object?>? arguments = null;
+
+        if (_queueOptions.EnableDeadLettering)
+        {
+            await _channel.ExchangeDeclareAsync(
+                exchange: _queueOptions.DeadLetterExchange,
+                type: ExchangeType.Direct,
+                durable: true,
+                autoDelete: false,
+                cancellationToken: CancellationToken.None);
+
+            await _channel.QueueDeclareAsync(
+                queue: _queueOptions.DeadLetterQueueName,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: null,
+                noWait: false,
+                cancellationToken: CancellationToken.None);
+
+            await _channel.QueueBindAsync(
+                queue: _queueOptions.DeadLetterQueueName,
+                exchange: _queueOptions.DeadLetterExchange,
+                routingKey: _queueOptions.DeadLetterRoutingKey,
+                cancellationToken: CancellationToken.None);
+
+            arguments = new Dictionary<string, object?>
+            {
+                ["x-dead-letter-exchange"] = _queueOptions.DeadLetterExchange,
+                ["x-dead-letter-routing-key"] = _queueOptions.DeadLetterRoutingKey
+            };
+        }
+
+        try
+        {
+            await _channel.QueueDeclareAsync(
+                queue: _queueOptions.QueueName,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: arguments,
+                noWait: false,
+                cancellationToken: CancellationToken.None);
+        }
+        catch (OperationInterruptedException ex) when (_queueOptions.EnableDeadLettering)
+        {
+            _logger.LogWarning(ex, "Telemetry queue declare with DLQ failed; retrying without DLQ arguments.");
+            await _channel.QueueDeclareAsync(
+                queue: _queueOptions.QueueName,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: null,
+                noWait: false,
+                cancellationToken: CancellationToken.None);
+        }
     }
 
     public void Dispose()

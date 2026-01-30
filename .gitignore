@@ -23,6 +23,7 @@ CMakeCache.txt
 cmake_install.cmake
 Makefile
 build/
+build_nogrpc/
 src/services/agent-cpp/build*/
 src/services/agent-cpp/build_*/
 *.o
@@ -68,6 +69,11 @@ coverage/
 
 # Local runtime artifacts
 Data/
+!src/services/core-dotnet/AetherGuard.Core/Data/
+!src/services/core-dotnet/AetherGuard.Core/Data/Migrations/
+!src/services/core-dotnet/AetherGuard.Core/Data/Migrations/**
+src/services/core-dotnet/AetherGuard.Core/Data/Snapshots/
+src/services/core-dotnet/AetherGuard.Core/Data/market_signal.json
 dummy_snapshot.tar.gz
 .compose.override.temp.yml
 .act-logs/

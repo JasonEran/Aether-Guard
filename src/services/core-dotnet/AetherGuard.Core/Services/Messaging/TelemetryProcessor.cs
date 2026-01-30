@@ -5,21 +5,24 @@ using System.Linq;
 using AetherGuard.Core.Data;
 using AetherGuard.Core.Models;
 using AetherGuard.Core.Services;
+using AetherGuard.Core.Services.SchemaRegistry;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using RabbitMQ.Client.Exceptions;
 
 namespace AetherGuard.Core.Services.Messaging;
 
 public sealed class TelemetryProcessor : BackgroundService
 {
-    private const string QueueName = "telemetry_data";
     private const string TraceParentHeader = "traceparent";
     private const string TraceStateHeader = "tracestate";
     private const string SchemaVersionHeader = "schema_version";
     private static readonly string[] RequeueKeywords = ["requeue", "retry"];
+    private const string TelemetrySchemaSubject = TelemetrySchemaDefinitions.TelemetryEnvelopeSubject;
+    private const string TelemetryPayloadSubject = TelemetrySchemaDefinitions.TelemetryPayloadSubject;
     private static readonly ActivitySource ActivitySource = new("AetherGuard.Core.Messaging");
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -31,13 +34,22 @@ public sealed class TelemetryProcessor : BackgroundService
     private readonly IConnection _connection;
     private readonly IChannel _channel;
     private readonly TelemetrySchemaOptions _schemaOptions;
+    private readonly TelemetryQueueOptions _queueOptions;
+    private readonly SchemaRegistryService _schemaRegistry;
 
-    public TelemetryProcessor(IConfiguration configuration, IServiceProvider serviceProvider, ILogger<TelemetryProcessor> logger)
+    public TelemetryProcessor(
+        IConfiguration configuration,
+        IServiceProvider serviceProvider,
+        SchemaRegistryService schemaRegistry,
+        ILogger<TelemetryProcessor> logger)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
+        _schemaRegistry = schemaRegistry;
         _schemaOptions = configuration.GetSection("TelemetrySchema").Get<TelemetrySchemaOptions>()
             ?? new TelemetrySchemaOptions();
+        _queueOptions = configuration.GetSection("TelemetryQueue").Get<TelemetryQueueOptions>()
+            ?? new TelemetryQueueOptions();
 
         var section = configuration.GetSection("RabbitMq");
         var host = section["Host"] ?? "localhost";
@@ -65,14 +77,7 @@ public sealed class TelemetryProcessor : BackgroundService
                 CancellationToken.None)
             .GetAwaiter()
             .GetResult();
-        _channel.QueueDeclareAsync(
-            queue: QueueName,
-            durable: true,
-            exclusive: false,
-            autoDelete: false,
-            arguments: null,
-            noWait: false,
-            cancellationToken: CancellationToken.None).GetAwaiter().GetResult();
+        ConfigureTelemetryQueueAsync().GetAwaiter().GetResult();
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -94,10 +99,16 @@ public sealed class TelemetryProcessor : BackgroundService
                     parentContext);
 
                 activity?.SetTag("messaging.system", "rabbitmq");
-                activity?.SetTag("messaging.destination", QueueName);
+                activity?.SetTag("messaging.destination", _queueOptions.QueueName);
 
                 var body = Encoding.UTF8.GetString(ea.Body.Span);
-                if (!TryDeserializePayload(body, ea.BasicProperties?.Headers, out var payload, out var schemaVersion))
+                using var document = JsonDocument.Parse(body);
+                if (!TryDeserializePayload(
+                        document.RootElement,
+                        ea.BasicProperties?.Headers,
+                        out var payload,
+                        out var schemaVersion,
+                        out var isEnvelope))
                 {
                     _logger.LogWarning("Dropped telemetry message with unsupported schema.");
                     activity?.SetTag("telemetry.schema.version", schemaVersion);
@@ -105,7 +116,15 @@ public sealed class TelemetryProcessor : BackgroundService
                     return;
                 }
 
+                var schemaSubject = isEnvelope ? TelemetrySchemaSubject : TelemetryPayloadSubject;
                 activity?.SetTag("telemetry.schema.version", schemaVersion);
+                activity?.SetTag("telemetry.schema.subject", schemaSubject);
+                if (!await _schemaRegistry.ValidateAsync(schemaSubject, schemaVersion, document.RootElement, stoppingToken))
+                {
+                    _logger.LogWarning("Telemetry schema {Subject} v{Version} failed validation.", schemaSubject, schemaVersion);
+                    await HandleUnsupportedSchemaAsync(ea.DeliveryTag, stoppingToken);
+                    return;
+                }
 
                 if (payload is null)
                 {
@@ -152,7 +171,11 @@ public sealed class TelemetryProcessor : BackgroundService
             }
         };
 
-        await _channel.BasicConsumeAsync(queue: QueueName, autoAck: false, consumer: consumer, cancellationToken: stoppingToken);
+        await _channel.BasicConsumeAsync(
+            queue: _queueOptions.QueueName,
+            autoAck: false,
+            consumer: consumer,
+            cancellationToken: stoppingToken);
 
         await Task.Delay(Timeout.Infinite, stoppingToken);
     }
@@ -211,26 +234,23 @@ public sealed class TelemetryProcessor : BackgroundService
     }
 
     private bool TryDeserializePayload(
-        string body,
+        JsonElement root,
         IDictionary<string, object?>? headers,
         out TelemetryPayload? payload,
-        out int schemaVersion)
+        out int schemaVersion,
+        out bool isEnvelope)
     {
         payload = null;
+        isEnvelope = false;
         schemaVersion = ResolveSchemaVersion(headers);
-
-        if (!IsSchemaSupported(schemaVersion))
-        {
-            return false;
-        }
 
         try
         {
-            using var document = JsonDocument.Parse(body);
-            if (document.RootElement.ValueKind == JsonValueKind.Object
-                && document.RootElement.TryGetProperty("payload", out var payloadElement))
+            if (root.ValueKind == JsonValueKind.Object
+                && root.TryGetProperty("payload", out _))
             {
-                var envelope = JsonSerializer.Deserialize<TelemetryEnvelope>(body, JsonOptions);
+                isEnvelope = true;
+                var envelope = root.Deserialize<TelemetryEnvelope>(JsonOptions);
                 if (envelope is null || !IsSchemaSupported(envelope.SchemaVersion))
                 {
                     schemaVersion = envelope?.SchemaVersion ?? schemaVersion;
@@ -239,11 +259,11 @@ public sealed class TelemetryProcessor : BackgroundService
 
                 payload = envelope.Payload;
                 schemaVersion = envelope.SchemaVersion;
-                return true;
+                return payload is not null;
             }
 
-            payload = JsonSerializer.Deserialize<TelemetryPayload>(body, JsonOptions);
-            return payload is not null;
+            payload = root.Deserialize<TelemetryPayload>(JsonOptions);
+            return payload is not null && IsSchemaSupported(schemaVersion);
         }
         catch (JsonException)
         {
@@ -296,5 +316,74 @@ public sealed class TelemetryProcessor : BackgroundService
 
         return RequeueKeywords.Any(keyword =>
             _schemaOptions.OnUnsupported.Trim().Contains(keyword, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task ConfigureTelemetryQueueAsync()
+    {
+        IDictionary<string, object?>? arguments = null;
+
+        if (_queueOptions.EnableDeadLettering)
+        {
+            await _channel.ExchangeDeclareAsync(
+                exchange: _queueOptions.DeadLetterExchange,
+                type: ExchangeType.Direct,
+                durable: true,
+                autoDelete: false,
+                cancellationToken: CancellationToken.None);
+
+            await _channel.QueueDeclareAsync(
+                queue: _queueOptions.DeadLetterQueueName,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: null,
+                noWait: false,
+                cancellationToken: CancellationToken.None);
+
+            await _channel.QueueBindAsync(
+                queue: _queueOptions.DeadLetterQueueName,
+                exchange: _queueOptions.DeadLetterExchange,
+                routingKey: _queueOptions.DeadLetterRoutingKey,
+                cancellationToken: CancellationToken.None);
+
+            arguments = new Dictionary<string, object?>
+            {
+                ["x-dead-letter-exchange"] = _queueOptions.DeadLetterExchange,
+                ["x-dead-letter-routing-key"] = _queueOptions.DeadLetterRoutingKey
+            };
+        }
+
+        try
+        {
+            await _channel.QueueDeclareAsync(
+                queue: _queueOptions.QueueName,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: arguments,
+                noWait: false,
+                cancellationToken: CancellationToken.None);
+        }
+        catch (OperationInterruptedException ex) when (_queueOptions.EnableDeadLettering)
+        {
+            _logger.LogWarning(ex, "Telemetry queue declare with DLQ failed; retrying without DLQ arguments.");
+            await _channel.QueueDeclareAsync(
+                queue: _queueOptions.QueueName,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: null,
+                noWait: false,
+                cancellationToken: CancellationToken.None);
+        }
+
+        if (_queueOptions.PrefetchCount > 0)
+        {
+            await _channel.BasicQosAsync(
+                prefetchSize: 0,
+                prefetchCount: _queueOptions.PrefetchCount,
+                global: false,
+                cancellationToken: CancellationToken.None);
+        }
     }
 }
