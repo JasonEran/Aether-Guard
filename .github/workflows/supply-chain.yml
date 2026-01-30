@@ -104,6 +104,9 @@ jobs:
     with:
       image: ${{ needs.build-core.outputs.image }}
       digest: ${{ needs.build-core.outputs.digest }}
+      registry-username: ${{ github.actor }}
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
 
   build-ai:
     runs-on: ubuntu-latest
@@ -193,6 +196,9 @@ jobs:
     with:
       image: ${{ needs.build-ai.outputs.image }}
       digest: ${{ needs.build-ai.outputs.digest }}
+      registry-username: ${{ github.actor }}
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
 
   build-web:
     runs-on: ubuntu-latest
@@ -282,6 +288,9 @@ jobs:
     with:
       image: ${{ needs.build-web.outputs.image }}
       digest: ${{ needs.build-web.outputs.digest }}
+      registry-username: ${{ github.actor }}
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
 
   build-agent:
     runs-on: ubuntu-latest
@@ -371,3 +380,6 @@ jobs:
     with:
       image: ${{ needs.build-agent.outputs.image }}
       digest: ${{ needs.build-agent.outputs.digest }}
+      registry-username: ${{ github.actor }}
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
