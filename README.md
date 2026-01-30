@@ -21,6 +21,7 @@ v2.2 reference architecture with a concrete implementation guide.
 - Stage: v2.2 baseline delivered (Phase 0-4). Remaining productization gaps tracked below (currently none).
 - License: MIT
 - Authors: Qi Junyi, Xiao Erdong (2026)
+- Sponsor: https://github.com/sponsors/JasonEran
 
 ## Product Delivery Standard (v2.2)
 
