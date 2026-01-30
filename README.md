@@ -52,7 +52,7 @@ This project targets a product-grade release, not a demo. The following standard
 - Core API (.NET 8): REST controllers plus gRPC services with JSON transcoding; RabbitMQ ingestion worker with W3C trace context propagation; migration orchestration; PostgreSQL storage.
 - Protobuf contracts: shared schemas in src/shared/protos (AgentService + ControlPlane).
 - Agent handshake: registration accepts capability payloads and returns AgentConfig to drive feature gating.
-- AI Engine (FastAPI): volatility and trend rules; Core currently sends empty spotPriceHistory (see Risk Logic).
+- AI Engine (FastAPI): volatility and trend rules; Core sends configurable spotPriceHistory samples (see Risk Logic).
 - Dashboard (Next.js): telemetry and command visibility with NextAuth credentials.
 - Storage: snapshots stored on local filesystem by default; optional S3/MinIO backend with retention sweeper and S3 lifecycle support.
 - Security: API key for command endpoints; SPIRE mTLS for agent/core; OpenTelemetry baseline across core/AI/dashboard.
@@ -62,7 +62,6 @@ This project targets a product-grade release, not a demo. The following standard
 
 - No schema registry or compatibility policy for MQ events.
 - Agent-side OpenTelemetry spans are not yet emitted (server-side spans/metrics are wired).
-- Core does not populate `spotPriceHistory` when calling the AI engine (volatility analysis is therefore stubbed).
 - No EF Core migrations or formal upgrade path (production requires schema versioning + migrations).
 
 Code scan note: no TODO/FIXME markers found in the repo; the remaining gaps are architectural items listed above.
@@ -284,6 +283,13 @@ Snapshot storage (docker-compose.yml):
 - SnapshotStorage__S3__UsePathStyle=true
 - SnapshotStorage__S3__Prefix=snapshots
 
+Spot price history (core-service):
+
+- SpotPriceHistory__0=1.0
+- SpotPriceHistory__1=1.01
+- SpotPriceHistory__2=0.99
+- SpotPriceHistory__3=1.0
+
 To keep local filesystem storage, set SnapshotStorage__Provider=Local (or remove the S3 settings).
 
 Snapshot retention (core-service):
@@ -375,7 +381,7 @@ Risk scoring uses these rules:
 - Volatility > 5.0: CRITICAL (Market Instability)
 - Otherwise: LOW (Stable)
 
-Note: The Core API currently sends an empty spotPriceHistory list; wire that data into Analyze requests to drive volatility decisions.
+Note: The Core API now sends a configurable spotPriceHistory list; override via SpotPriceHistory__* environment variables to drive volatility decisions.
 
 ## Data Model
 
