@@ -62,6 +62,10 @@ This project targets a product-grade release, not a demo. The following standard
 
 - No schema registry or compatibility policy for MQ events.
 - Agent-side OpenTelemetry spans are not yet emitted (server-side spans/metrics are wired).
+- Core does not populate `spotPriceHistory` when calling the AI engine (volatility analysis is therefore stubbed).
+- No EF Core migrations or formal upgrade path (production requires schema versioning + migrations).
+
+Code scan note: no TODO/FIXME markers found in the repo; the remaining gaps are architectural items listed above.
 
 ## v2.2 Reference Architecture
 
