@@ -14,6 +14,7 @@ Semantic Versioning.
 - API key protection for telemetry ingestion and snapshot artifact endpoints.
 - v2.3 multimodal predictive architecture document in `docs/ARCHITECTURE-v2.3.md`.
 - v2.3 delivery roadmap in `docs/ROADMAP-v2.3.md`.
+- Expanded v2.3 roadmap with model choices, data sources, and validation guidance.
 - Verification scripts now support API key headers and optional agent build flags.
 
 ### Changed

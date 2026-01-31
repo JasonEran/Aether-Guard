@@ -28,8 +28,9 @@ minimize integration risk while preserving backward compatibility with the v2.2 
 
 **Goal**: Extract semantic vectors from signals without impacting core latency.
 
-- Add NLP service for incident sentiment and volatility likelihood.
-- Define and version `V_news` and `B_capacity` output schemas.
+- Add NLP service for incident sentiment and volatility likelihood (FinBERT or domain BERT).
+- Add LLM summarizer for longer advisories and policy updates.
+- Define and version `S_v`, `P_v`, and `B_s` output schemas.
 - Expose a batch API for enrichment and caching.
 
 **Exit Criteria**
@@ -41,7 +42,7 @@ minimize integration risk while preserving backward compatibility with the v2.2 
 
 **Goal**: Train and evaluate models with historical replay.
 
-- Add TSMixer baseline for numerical telemetry.
+- Add TSMixer baseline for numerical telemetry (PyTorch), with export to ONNX for agent inference.
 - Fuse exogenous semantic vectors for `P(Preemption | Telemetry, Signals)`.
 - Backtest on historical windows and held-out stress periods.
 
@@ -82,8 +83,21 @@ minimize integration risk while preserving backward compatibility with the v2.2 
 - Canary deployment with automatic rollback.
 - End-to-end regression tests on v2.2 compatibility.
 
+## Data Sources and Tooling (Recommended)
+
+- **Spot price history**: AWS Spot Price History API.
+- **Telemetry traces**: Alibaba or Google cluster traces.
+- **Incident signals**: provider health dashboards, incident/status RSS feeds.
+- **Optional economic signals**: vendor advisories, capacity planning updates, curated news feeds.
+- **NLP tooling**: Hugging Face transformers for FinBERT/domain BERT; LLM summarization via the AI engine.
+
+## References (Design Justification)
+
+- FinBERT (financial sentiment baseline).
+- TSMixer (all-MLP time-series forecasting).
+- Dynamic risk management literature for adaptive thresholds.
+
 ## Non-goals (v2.3)
 
 - Full market simulation of all cloud tenants.
 - Removal of existing v2.2 API surfaces.
-

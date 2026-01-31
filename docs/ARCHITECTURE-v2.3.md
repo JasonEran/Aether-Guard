@@ -40,7 +40,7 @@ flowchart LR
   Agent[Agent (C++ TSMixer)] -->|Telemetry| Core[Control Plane (.NET)]
   Core -->|Commands| Agent
   Signals[External Signals] -->|Status/Incidents| NLP[Semantic Enrichment (AI Engine)]
-  NLP -->|V_news, B_capacity| Core
+  NLP -->|S_v, P_v, B_s| Core
   Core -->|Semantic Features (gRPC Heartbeat)| Agent
   Core -->|Telemetry + Signals| DB[(PostgreSQL/Timescale)]
   Core --> Dashboard[Dashboard (Next.js)]
@@ -53,6 +53,8 @@ enough for low-latency inference on the agent.
 
 - **Time-mixing MLP**: learns temporal patterns (for example, CPU spike persistence).
 - **Feature-mixing MLP**: learns cross-signal correlations (for example, memory dirty rate plus disk IOPS).
+- **Why TSMixer (vs Transformers)**: lower complexity, stable training on multivariate series, and small model
+  footprint enable sub-millisecond inference on agents without attention overhead.
 
 ### 4.2 Semantic Stream (Domain NLP)
 
@@ -60,16 +62,35 @@ Telemetry alone misses off-chart events. We introduce a semantic pipeline for cl
 
 - **Input sources**: provider health dashboards, incident reports, capacity advisories, maintenance notices, regional
   outages, and major upstream dependency alerts.
-- **Model**: a domain-adapted transformer (BERT-class) for incident sentiment and volatility likelihood, plus LLM
-  summarization for longer-form advisories.
-- **Outputs**:
-  - `V_news`: sentiment vector + volatility probability.
-  - `B_capacity`: long-horizon capacity pressure bias.
+- **Model**: a domain-adapted transformer (BERT-class). If economic signals are used, FinBERT is a reasonable baseline
+  for finance-domain text; an LLM summarizer handles longer advisories and provider policy updates.
+- **Outputs (standardized)**:
+  - `S_v`: sentiment vector (normalized polarity + severity).
+  - `P_v`: volatility probability (0-1).
+  - `B_s`: supply or capacity bias (long-horizon).
+
+Optional signal extensions (if governance allows):
+
+- Provider pricing methodology updates, capacity planning statements, or public filings.
+- External feeds (for example, NewsAPI/Alpha Vantage) for incident-related headlines.
 
 ### 4.3 Fusion Layer (Correlated Prediction)
 
 Semantic signals are treated as **exogenous variables** in the forecasting head. The objective becomes
 `P(Preemption | Telemetry, ExternalSignals)` rather than purely `P(Preemption | Telemetry)`.
+
+Formally:
+
+```
+X_t = [x_{t-k}, ..., x_t]          # numerical window
+Z_t = [S_v, P_v, B_s]              # semantic features
+h_t = TSMixer(X_t, Z_t)            # fused representation
+P_preempt = sigma(W * h_t)         # preemption probability
+```
+
+Example causal pattern:
+
+> GPU shortage advisory + rising spot volatility -> preemption probability spikes within 60 minutes.
 
 ## 5) Federated Inference
 
@@ -85,10 +106,25 @@ Static thresholds are replaced by dynamic risk allocation:
 U = Savings - (RiskFactor * CostOfFailure) - MigrationCost
 ```
 
+We also define a simplified decision score for explainability:
+
+```
+DecisionScore = lambda * SavingsScore + (1 - lambda) * ConfidenceScore
+```
+
 - **Confidence Score (C)**: correlation strength between telemetry and external signals.
 - **Risk Allocation Factor (alpha)**: scales sensitivity to preemption signals.
   - **Risk-on**: stable telemetry + neutral signals -> lower alpha -> maximize savings.
   - **Risk-off**: negative signals + rising volatility -> higher alpha -> preemptive migration.
+
+Reference pseudocode:
+
+```
+if P_preempt * alpha > threshold:
+    migrate()
+else:
+    stay_on_spot()
+```
 
 ## 7) Training Methodology (Historical Replay, Not Simulation)
 
@@ -96,7 +132,13 @@ U = Savings - (RiskFactor * CostOfFailure) - MigrationCost
 - Adopt historical trace replay and backtesting:
   - Merge cluster traces with spot price history and incident/news archives.
   - Replay the agent through real timelines to learn causal patterns.
-  - Validate on held-out stress windows (for example, major regional outages).
+  - Validate on held-out stress windows (for example, major regional outages or GPU shortages).
+
+Recommended public sources for replay:
+
+- AWS Spot Price History API (pricing time series).
+- Alibaba or Google cluster trace datasets (resource usage).
+- Public incident and status archives for semantic signals.
 
 ## 8) Implementation Implications (Preview)
 
@@ -105,7 +147,13 @@ U = Savings - (RiskFactor * CostOfFailure) - MigrationCost
 - **Control plane**: enrich agent heartbeat payloads with semantic features.
 - **AI engine**: host inference services for semantic extraction and fusion.
 
-## 9) Non-goals
+## 9) Literature Anchors (Design Justification)
+
+- FinBERT for finance-domain sentiment analysis (optional baseline for economic signals).
+- TSMixer for efficient multivariate time-series forecasting.
+- Dynamic risk management literature for adaptive thresholds in volatile systems.
+
+## 10) Non-goals
 
 - Full market simulation of other tenants.
 - Replacing existing v2.2 APIs without a compatibility layer.
