@@ -2,8 +2,10 @@
 
 ## Is this production-ready?
 
-The repo is an MVP plus a v2.2 reference architecture. Some productization gaps remain
-(end-to-end auth, schema registry). The checklist in `README.md` tracks progress.
+This repo implements the v2.2 baseline and includes a release validation path. Whether you
+should treat it as production-ready depends on your SLOs, security/compliance requirements,
+and operational integration. The v2.3 multimodal predictive roadmap is documented in
+`README.md`.
 
 ## How do I change the dashboard admin credentials?
 

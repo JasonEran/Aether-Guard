@@ -18,7 +18,7 @@ v2.2 reference architecture with a concrete implementation guide.
 
 ## Project Status
 
-- Stage: v2.2 baseline delivered (Phase 0-4). Remaining productization gaps tracked below (currently none).
+- Stage: v2.2 baseline delivered (Phase 0-4). v2.3 transition roadmap defined below.
 - License: MIT
 - Authors: Qi Junyi, Xiao Erdong (2026)
 - Sponsor: https://github.com/sponsors/JasonEran
@@ -130,6 +130,92 @@ This project targets a product-grade release, not a demo. The following standard
 - [x] Add OpenTelemetry collector + Jaeger and wire core/AI/dashboard exporters.
 - [x] Add snapshot retention automation and S3 lifecycle policy support.
 - [x] Generate SBOMs and sign container images with cosign in CI.
+
+## v2.3 Architectural Transition: Multimodal Predictive Cloud Operating System
+
+This section defines the next framework after v2.2. It is a forward-looking roadmap to evolve Aether-Guard from a
+reactive supervisor into a predictive, multimodal cloud operating system. The focus is on risk allocation that
+optimizes availability and spot-cost savings under stochastic market conditions.
+
+### 1) Executive Summary and Strategic Context
+
+- Genesis: Aether-Guard delivered an MVP in a rapid sprint to democratize Spot Instance usage by mitigating
+  preemption risk via CRIU checkpoint/restore.
+- Current state: A lightweight C++17 agent and an ASP.NET Core control plane (currently .NET 8 in this repo)
+  secured with SPIFFE/SPIRE and API keys.
+- Limitation: Today's decision logic relies on heuristic thresholds that are reactive, not predictive. Conservative
+  thresholds protect uptime but erode the 60-90% savings that justify spot adoption.
+
+### 2) Vision: Predictive Cloud Operating System
+
+We target an optimal risk allocation between service stability (SLO adherence) and cost efficiency
+(spot vs on-demand delta). This requires a market dynamics model that correlates internal telemetry with external
+semantic signals (news, financial reports) rather than attempting to simulate the entire market.
+
+Four pivots define the transition:
+
+- Algorithmic pivot: from static regression to time-series forecasting (TSMixer) augmented by NLP.
+- Architectural pivot: from centralized control to federated inference with embedded AI on agents.
+- Informational pivot: from unimodal telemetry to multimodal intelligence (numbers plus semantics).
+- Methodological pivot: from synthetic simulation to historical trace replay and backtesting.
+
+### 3) Feasibility: Multimodal Prediction Architecture
+
+#### 3.1 Numerical Stream (TSMixer)
+
+TSMixer uses MLP-only layers to mix time and features for multivariate forecasting. It avoids attention
+complexity and enables low-latency inference on the C++ agent.
+
+- Time-mixing MLP: learns temporal patterns (for example, CPU spike persistence).
+- Feature-mixing MLP: learns cross-signal correlations (for example, memory dirty rate plus disk IOPS).
+
+#### 3.2 Semantic Stream (FinBERT plus LLM)
+
+Numerical telemetry cannot capture off-chart events. We introduce a semantic pipeline:
+
+- FinBERT for real-time news sentiment: provider status pages, outage reports, macro headlines.
+- LLM summarization for financial and strategy signals: 10-K and 10-Q notes, pricing policy updates, capex guidance.
+- Outputs:
+  - V_news: sentiment vector plus volatility probability.
+  - B_supply: long-horizon supply constraint bias.
+
+#### 3.3 Fusion Layer (Correlated Prediction)
+
+Semantic signals become exogenous variables in the TSMixer head. The target is no longer
+P(Price | History) but P(Price | History, News, Reports) to distinguish noise from event-driven volatility.
+
+### 4) Federated Inference
+
+- Agent: runs low-latency TSMixer locally for numerical prediction.
+- Control plane: computes semantic vectors asynchronously and pushes them via gRPC heartbeat.
+- Result: lightweight agent, heavyweight NLP in the cloud, consistent decision loop across the fleet.
+
+### 5) Dynamic Risk Management (Decision Logic)
+
+We replace static thresholds with a dynamic risk allocation model:
+
+```
+U = Savings - (RiskFactor * CostOfFailure) - MigrationCost
+```
+
+- Confidence Score (C): correlation strength between telemetry and semantic signals.
+- Risk Allocation Factor (alpha): scales sensitivity to preemption signals.
+  - Risk-on: stable telemetry plus neutral news -> lower alpha -> maximize savings.
+  - Risk-off: negative news plus rising volatility -> higher alpha -> preemptive migration.
+
+### 6) Training Methodology (Historical Replay, Not Simulation)
+
+- Reject agent-based market simulation as speculative and brittle.
+- Adopt historical trace replay and backtesting:
+  - Merge cluster traces (resource usage) with spot price history and historical tech news.
+  - Replay the agent through real timelines to learn causal patterns.
+  - Validate on held-out stress periods (for example, major GPU shortages or outages).
+
+### 7) Research Anchors (for design justification)
+
+- FinBERT for financial sentiment analysis.
+- TSMixer for efficient multivariate time-series forecasting.
+- Dynamic risk management literature in finance and systems for adaptive thresholds.
 
 ## Architecture (Current Data Flow)
 
