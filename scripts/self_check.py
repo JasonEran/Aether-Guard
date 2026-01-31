@@ -141,6 +141,8 @@ def check_node(required: bool) -> CheckResult:
 
 def check_npm(required: bool) -> CheckResult:
     ok, output = run_command(["npm", "--version"])
+    if not ok and platform.system().lower() == "windows":
+        ok, output = run_command(["npm.cmd", "--version"])
     if not ok:
         status = STATUS_FAIL if required else STATUS_WARN
         return CheckResult(status, "npm", output)

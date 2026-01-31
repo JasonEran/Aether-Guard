@@ -33,7 +33,12 @@ def build_multipart_body(file_path: Path) -> tuple[bytes, str]:
     return b"".join(parts), boundary
 
 
-def request_bytes(method: str, url: str, body: bytes | None = None, headers: dict | None = None) -> bytes:
+def request_bytes(
+    method: str,
+    url: str,
+    body: bytes | None = None,
+    headers: dict | None = None,
+) -> bytes:
     req = urllib.request.Request(url, data=body, headers=headers or {}, method=method)
     try:
         with urllib.request.urlopen(req, timeout=15) as response:
@@ -83,6 +88,14 @@ def resolve_storage_mode() -> str:
     return "local"
 
 
+def resolve_api_key() -> str | None:
+    for key in ("AG_API_KEY", "COMMAND_API_KEY", "Security__ArtifactApiKey"):
+        value = os.getenv(key)
+        if value:
+            return value
+    return None
+
+
 def md5_digest(data: bytes) -> str:
     return hashlib.md5(data).hexdigest()
 
@@ -95,6 +108,8 @@ def run_command(command: list[str], workdir: Path) -> None:
             check=True,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
         )
     except FileNotFoundError as exc:
         raise RuntimeError(f"{command[0]} not found on PATH.") from exc
@@ -107,19 +122,36 @@ def run_command(command: list[str], workdir: Path) -> None:
 
 
 def build_and_test_agent() -> None:
+    if os.getenv("AG_SKIP_AGENT_BUILD", "").strip().lower() in {"1", "true", "yes"}:
+        print("Skipping agent build (AG_SKIP_AGENT_BUILD=true).")
+        return
     agent_dir = ROOT / "src/services/agent-cpp"
     build_dir = agent_dir / "build_phase3"
     build_dir.mkdir(parents=True, exist_ok=True)
 
-    run_command(["cmake", "-S", str(agent_dir), "-B", str(build_dir)], ROOT)
-    run_command(["cmake", "--build", str(build_dir)], ROOT)
+    cmake_args = ["cmake", "-S", str(agent_dir), "-B", str(build_dir)]
+    enable_grpc = os.getenv("AG_AGENT_ENABLE_GRPC", "true").strip().lower()
+    if enable_grpc in {"0", "false", "no", "off"}:
+        cmake_args += [
+            "-DAETHER_ENABLE_GRPC=OFF",
+            "-DAETHER_USE_LOCAL_PROTOBUF=ON",
+        ]
+    run_command(cmake_args, ROOT)
+    build_cmd = ["cmake", "--build", str(build_dir)]
+    if os.name == "nt":
+        build_cmd += ["--config", "Release"]
+    run_command(build_cmd, ROOT)
 
     try:
-        run_command(["ctest", "--test-dir", str(build_dir), "--output-on-failure"], ROOT)
-    except RuntimeError:
-        test_binary = build_dir / "AetherAgentTests"
+        ctest_cmd = ["ctest", "--test-dir", str(build_dir), "--output-on-failure"]
         if os.name == "nt":
-            test_binary = test_binary.with_suffix(".exe")
+            ctest_cmd += ["-C", "Release"]
+        run_command(ctest_cmd, ROOT)
+    except RuntimeError:
+        if os.name == "nt":
+            test_binary = build_dir / "Release" / "AetherAgentTests.exe"
+        else:
+            test_binary = build_dir / "AetherAgentTests"
         if not test_binary.exists():
             raise
         run_command([str(test_binary)], ROOT)
@@ -136,7 +168,13 @@ def main() -> int:
 
     body, boundary = build_multipart_body(dummy_path)
     upload_url = f"{base_url}/upload/{quote(workload_id)}"
-    headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
+    api_key = resolve_api_key()
+    if not api_key:
+        raise RuntimeError("Artifact API key missing. Set AG_API_KEY or COMMAND_API_KEY.")
+    headers = {
+        "Content-Type": f"multipart/form-data; boundary={boundary}",
+        "X-API-Key": api_key,
+    }
     request_bytes("POST", upload_url, body=body, headers=headers)
 
     storage_mode = resolve_storage_mode()
@@ -162,7 +200,7 @@ def main() -> int:
             return 1
 
     download_url = f"{base_url}/download/{quote(workload_id)}"
-    downloaded_bytes = request_bytes("GET", download_url)
+    downloaded_bytes = request_bytes("GET", download_url, headers={"X-API-Key": api_key})
     downloaded_md5 = md5_digest(downloaded_bytes)
 
     if downloaded_md5 != original_md5:

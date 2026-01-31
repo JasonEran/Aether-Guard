@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -65,9 +66,19 @@ def check_agent_build(errors: list[str]) -> None:
     build_dir = agent_dir / "build_blueprint_v1"
     build_dir.mkdir(parents=True, exist_ok=True)
 
+    if os.getenv("AG_SKIP_AGENT_BUILD", "").strip().lower() in {"1", "true", "yes"}:
+        return
+
     try:
+        cmake_args = ["cmake", "-S", str(agent_dir), "-B", str(build_dir)]
+        enable_grpc = os.getenv("AG_AGENT_ENABLE_GRPC", "true").strip().lower()
+        if enable_grpc in {"0", "false", "no", "off"}:
+            cmake_args += [
+                "-DAETHER_ENABLE_GRPC=OFF",
+                "-DAETHER_USE_LOCAL_PROTOBUF=ON",
+            ]
         subprocess.run(
-            ["cmake", "-S", str(agent_dir), "-B", str(build_dir)],
+            cmake_args,
             check=True,
             capture_output=True,
             text=True,
