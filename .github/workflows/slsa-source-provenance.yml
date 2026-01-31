@@ -2,10 +2,6 @@ name: SLSA Provenance (Source)
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - master
 
 permissions:
   contents: read

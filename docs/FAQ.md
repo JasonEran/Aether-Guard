@@ -4,8 +4,8 @@
 
 This repo implements the v2.2 baseline and includes a release validation path. Whether you
 should treat it as production-ready depends on your SLOs, security/compliance requirements,
-and operational integration. The v2.3 multimodal predictive roadmap is documented in
-`README.md`.
+and operational integration. The v2.3 roadmap is documented in
+`docs/ARCHITECTURE-v2.3.md`.
 
 ## How do I change the dashboard admin credentials?
 

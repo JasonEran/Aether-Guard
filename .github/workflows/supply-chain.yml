@@ -2,10 +2,6 @@ name: Supply Chain (SBOM + Cosign + SLSA)
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - master
 
 permissions:
   contents: read
