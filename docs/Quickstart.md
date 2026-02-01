@@ -35,6 +35,23 @@ Open the dashboard at `http://localhost:3000` and log in with:
 
 Open Jaeger at `http://localhost:16686` to view traces.
 
+## Optional: Enable external signals (v2.3 Milestone 0)
+
+External signals ingestion is disabled by default. To enable:
+
+```bash
+# PowerShell
+$env:ExternalSignals__Enabled="true"
+# Bash
+export ExternalSignals__Enabled=true
+```
+
+Then restart the core service. Signals are accessible via:
+
+```
+GET /api/v1/signals?limit=50
+```
+
 If you want to simulate migrations, start at least two agents:
 
 ```bash

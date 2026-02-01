@@ -13,6 +13,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Agent> Agents => Set<Agent>();
     public DbSet<AgentCommand> AgentCommands => Set<AgentCommand>();
     public DbSet<CommandAudit> CommandAudits => Set<CommandAudit>();
+    public DbSet<ExternalSignal> ExternalSignals => Set<ExternalSignal>();
     public DbSet<TelemetryRecord> TelemetryRecords => Set<TelemetryRecord>();
     public DbSet<SchemaRegistryEntry> SchemaRegistryEntries => Set<SchemaRegistryEntry>();
 
@@ -86,6 +87,26 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Version).HasColumnName("version");
             entity.Property(e => e.Schema).HasColumnName("schema");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+        });
+
+        modelBuilder.Entity<ExternalSignal>(entity =>
+        {
+            entity.ToTable("external_signals");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.Source, e.ExternalId }).IsUnique();
+            entity.HasIndex(e => e.PublishedAt);
+            entity.Property(e => e.Id).HasColumnName("id").ValueGeneratedOnAdd();
+            entity.Property(e => e.Source).HasColumnName("source");
+            entity.Property(e => e.ExternalId).HasColumnName("external_id");
+            entity.Property(e => e.Title).HasColumnName("title");
+            entity.Property(e => e.Summary).HasColumnName("summary");
+            entity.Property(e => e.Region).HasColumnName("region");
+            entity.Property(e => e.Severity).HasColumnName("severity");
+            entity.Property(e => e.Category).HasColumnName("category");
+            entity.Property(e => e.Url).HasColumnName("url");
+            entity.Property(e => e.Tags).HasColumnName("tags");
+            entity.Property(e => e.PublishedAt).HasColumnName("published_at");
+            entity.Property(e => e.IngestedAt).HasColumnName("ingested_at");
         });
     }
 }

@@ -51,6 +51,11 @@ builder.Services.AddGrpc().AddJsonTranscoding();
 
 builder.Services.AddSingleton<TelemetryStore>();
 builder.Services.AddHttpClient<AnalysisService>();
+builder.Services.AddHttpClient("external-signals", client =>
+{
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Aether-Guard/ExternalSignals");
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
 builder.Services.AddScoped<AgentWorkflowService>();
 builder.Services.AddScoped<TelemetryIngestionService>();
 builder.Services.AddScoped<ControlPlaneService>();
@@ -64,6 +69,9 @@ builder.Services.AddHostedService<MigrationCycleService>();
 builder.Services.AddHostedService<SnapshotRetentionService>();
 builder.Services.AddSingleton<AetherGuard.Core.Services.SchemaRegistry.SchemaRegistryService>();
 builder.Services.AddHostedService<AetherGuard.Core.Services.SchemaRegistry.SchemaRegistrySeeder>();
+builder.Services.Configure<AetherGuard.Core.Services.ExternalSignals.ExternalSignalsOptions>(
+    builder.Configuration.GetSection("ExternalSignals"));
+builder.Services.AddHostedService<AetherGuard.Core.Services.ExternalSignals.ExternalSignalIngestionService>();
 
 var otelOptions = builder.Configuration.GetSection("OpenTelemetry").Get<OpenTelemetryOptions>()
     ?? new OpenTelemetryOptions();

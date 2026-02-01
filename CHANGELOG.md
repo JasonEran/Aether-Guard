@@ -12,6 +12,7 @@ Semantic Versioning.
 - Snapshot retention sweeper with optional S3 lifecycle configuration.
 - Supply-chain workflow for SBOM generation, cosign signing, and SLSA container provenance.
 - API key protection for telemetry ingestion and snapshot artifact endpoints.
+- External signals ingestion pipeline (RSS feeds) with persisted `external_signals` table.
 - v2.3 multimodal predictive architecture document in `docs/ARCHITECTURE-v2.3.md`.
 - v2.3 delivery roadmap in `docs/ROADMAP-v2.3.md`.
 - Expanded v2.3 roadmap with model choices, data sources, and validation guidance.
