@@ -13,6 +13,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Agent> Agents => Set<Agent>();
     public DbSet<AgentCommand> AgentCommands => Set<AgentCommand>();
     public DbSet<CommandAudit> CommandAudits => Set<CommandAudit>();
+    public DbSet<ExternalSignalFeedState> ExternalSignalFeedStates => Set<ExternalSignalFeedState>();
     public DbSet<ExternalSignal> ExternalSignals => Set<ExternalSignal>();
     public DbSet<TelemetryRecord> TelemetryRecords => Set<TelemetryRecord>();
     public DbSet<SchemaRegistryEntry> SchemaRegistryEntries => Set<SchemaRegistryEntry>();
@@ -107,6 +108,21 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Tags).HasColumnName("tags");
             entity.Property(e => e.PublishedAt).HasColumnName("published_at");
             entity.Property(e => e.IngestedAt).HasColumnName("ingested_at");
+        });
+
+        modelBuilder.Entity<ExternalSignalFeedState>(entity =>
+        {
+            entity.ToTable("external_signal_feeds");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Name).IsUnique();
+            entity.Property(e => e.Id).HasColumnName("id").ValueGeneratedOnAdd();
+            entity.Property(e => e.Name).HasColumnName("name");
+            entity.Property(e => e.Url).HasColumnName("url");
+            entity.Property(e => e.LastFetchAt).HasColumnName("last_fetch_at");
+            entity.Property(e => e.LastSuccessAt).HasColumnName("last_success_at");
+            entity.Property(e => e.FailureCount).HasColumnName("failure_count");
+            entity.Property(e => e.LastError).HasColumnName("last_error");
+            entity.Property(e => e.LastStatusCode).HasColumnName("last_status_code");
         });
     }
 }

@@ -78,4 +78,25 @@ public class ExternalSignalsController : ControllerBase
         _logger.LogInformation("Returned {Count} external signals.", results.Count);
         return Ok(results);
     }
+
+    [HttpGet("feeds")]
+    public async Task<IActionResult> GetFeedStates(CancellationToken cancellationToken = default)
+    {
+        var feeds = await _db.ExternalSignalFeedStates
+            .AsNoTracking()
+            .OrderBy(state => state.Name)
+            .Select(state => new
+            {
+                state.Name,
+                state.Url,
+                state.LastFetchAt,
+                state.LastSuccessAt,
+                state.FailureCount,
+                state.LastError,
+                state.LastStatusCode
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(feeds);
+    }
 }

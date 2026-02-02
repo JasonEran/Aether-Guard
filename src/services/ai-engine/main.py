@@ -1,8 +1,9 @@
 import logging
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
@@ -14,8 +15,18 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from model import RiskScorer
 
 logger = logging.getLogger("uvicorn.error")
-app = FastAPI()
 scorer = RiskScorer()
+
+
+@asynccontextmanager
+async def lifespan(app_instance: FastAPI):
+    configure_tracing()
+    app_instance.state.scorer = scorer
+    logger.info("AI Engine Online.")
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 class RiskPayload(BaseModel):
@@ -23,15 +34,30 @@ class RiskPayload(BaseModel):
     rebalance_signal: bool = Field(alias="rebalanceSignal")
     capacity_score: float = Field(alias="capacityScore")
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
-@app.on_event("startup")
-def load_model() -> None:
-    configure_tracing()
-    app.state.scorer = scorer
-    logger.info("AI Engine Online.")
+class SignalDocument(BaseModel):
+    source: str
+    title: str
+    summary: str | None = None
+    url: str | None = None
+    region: str | None = None
+    published_at: str | None = Field(default=None, alias="publishedAt")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class EnrichRequest(BaseModel):
+    documents: list[SignalDocument]
+
+
+class EnrichResponse(BaseModel):
+    s_v: list[float] = Field(alias="S_v")
+    p_v: float = Field(alias="P_v")
+    b_s: float = Field(alias="B_s")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 @app.get("/")
@@ -60,6 +86,25 @@ def analyze(payload: RiskPayload) -> dict:
         "confidence": confidence,
     }
 
+
+@app.post("/signals/enrich", response_model=EnrichResponse)
+def enrich_signals(payload: EnrichRequest) -> EnrichResponse:
+    # Placeholder semantic enrichment: use simple heuristics until NLP pipeline is online.
+    combined = " ".join(
+        [doc.title + " " + (doc.summary or "") for doc in payload.documents]
+    ).lower()
+    negative_terms = ("outage", "disruption", "degraded", "incident", "latency", "unavailable")
+    has_negative = any(term in combined for term in negative_terms)
+
+    s_v = [0.1, 0.1, 0.1]
+    p_v = 0.15
+    b_s = 0.0
+    if has_negative:
+        s_v = [0.9, 0.2, 0.1]
+        p_v = 0.85
+        b_s = 0.2
+
+    return EnrichResponse(S_v=s_v, P_v=p_v, B_s=b_s)
 
 def configure_tracing() -> None:
     endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")

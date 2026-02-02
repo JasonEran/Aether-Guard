@@ -52,6 +52,12 @@ Then restart the core service. Signals are accessible via:
 GET /api/v1/signals?limit=50
 ```
 
+Feed health status is available via:
+
+```
+GET /api/v1/signals/feeds
+```
+
 If you want to simulate migrations, start at least two agents:
 
 ```bash

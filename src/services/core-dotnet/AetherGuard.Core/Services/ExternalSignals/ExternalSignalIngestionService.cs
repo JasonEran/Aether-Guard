@@ -1,7 +1,3 @@
-using System.Globalization;
-using System.Net;
-using System.Text.RegularExpressions;
-using System.Xml.Linq;
 using AetherGuard.Core.Data;
 using AetherGuard.Core.Models;
 using Microsoft.EntityFrameworkCore;
@@ -11,19 +7,6 @@ namespace AetherGuard.Core.Services.ExternalSignals;
 
 public sealed class ExternalSignalIngestionService : BackgroundService
 {
-    private static readonly string[] SeverityKeywords =
-    [
-        "outage",
-        "degraded",
-        "disruption",
-        "investigating",
-        "incident",
-        "partial",
-        "unavailable",
-        "restored",
-        "resolved"
-    ];
-
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<ExternalSignalIngestionService> _logger;
@@ -100,12 +83,15 @@ public sealed class ExternalSignalIngestionService : BackgroundService
             try
             {
                 var response = await httpClient.GetAsync(feed.Url, cancellationToken);
+                var statusCode = (int)response.StatusCode;
                 response.EnsureSuccessStatusCode();
                 var content = await response.Content.ReadAsStringAsync(cancellationToken);
-                parsed = ParseFeed(content, feed);
+                parsed = ExternalSignalParser.ParseFeed(content, feed);
+                await UpdateFeedStateAsync(db, feed, statusCode, null, cancellationToken);
             }
             catch (Exception ex)
             {
+                await UpdateFeedStateAsync(db, feed, null, ex.Message, cancellationToken);
                 _logger.LogWarning(ex, "Failed to fetch external signal feed {Feed}.", feed.Name);
                 continue;
             }
@@ -150,178 +136,42 @@ public sealed class ExternalSignalIngestionService : BackgroundService
         }
     }
 
-    private static List<ExternalSignal> ParseFeed(string content, ExternalSignalFeedOptions feed)
+    private static async Task UpdateFeedStateAsync(
+        ApplicationDbContext db,
+        ExternalSignalFeedOptions feed,
+        int? statusCode,
+        string? error,
+        CancellationToken cancellationToken)
     {
-        var document = XDocument.Parse(content);
-        var root = document.Root;
-        if (root is null)
-        {
-            return [];
-        }
+        var state = await db.ExternalSignalFeedStates
+            .FirstOrDefaultAsync(existing => existing.Name == feed.Name, cancellationToken);
 
-        var items = root.Name.LocalName switch
+        if (state is null)
         {
-            "rss" => root.Descendants().Where(e => e.Name.LocalName == "item"),
-            "feed" => root.Descendants().Where(e => e.Name.LocalName == "entry"),
-            _ => root.Descendants().Where(e => e.Name.LocalName == "item" || e.Name.LocalName == "entry")
-        };
-
-        var signals = new List<ExternalSignal>();
-        foreach (var item in items)
-        {
-            var title = GetValue(item, "title");
-            if (string.IsNullOrWhiteSpace(title))
+            state = new ExternalSignalFeedState
             {
-                continue;
-            }
-
-            var externalId = GetValue(item, "guid") ?? GetValue(item, "id") ?? title;
-            var url = GetValue(item, "link");
-            if (string.IsNullOrWhiteSpace(url))
-            {
-                url = GetLinkHref(item);
-            }
-
-            var summaryRaw = GetValue(item, "description") ?? GetValue(item, "summary") ?? GetValue(item, "content");
-            var summary = NormalizeText(summaryRaw);
-            var published = ParseDate(GetValue(item, "pubDate"))
-                ?? ParseDate(GetValue(item, "updated"))
-                ?? ParseDate(GetValue(item, "published"))
-                ?? DateTimeOffset.UtcNow;
-
-            var severity = GuessSeverity(title, summary);
-            var category = GuessCategory(title, summary);
-            var region = ExtractRegion(title, summary) ?? feed.DefaultRegion;
-
-            signals.Add(new ExternalSignal
-            {
-                Source = feed.Name,
-                ExternalId = externalId,
-                Title = title,
-                Summary = summary,
-                Region = region,
-                Severity = severity,
-                Category = category,
-                Url = url,
-                Tags = BuildTags(title, summary, severity, category),
-                PublishedAt = published,
-                IngestedAt = DateTimeOffset.UtcNow
-            });
+                Name = feed.Name,
+                Url = feed.Url
+            };
+            db.ExternalSignalFeedStates.Add(state);
         }
 
-        return signals;
-    }
+        state.Url = feed.Url;
+        state.LastFetchAt = DateTimeOffset.UtcNow;
+        state.LastStatusCode = statusCode;
 
-    private static string? GetValue(XElement parent, string name)
-    {
-        return parent.Elements().FirstOrDefault(e => e.Name.LocalName.Equals(name, StringComparison.OrdinalIgnoreCase))?.Value;
-    }
-
-    private static string? GetLinkHref(XElement parent)
-    {
-        var link = parent.Elements().FirstOrDefault(e => e.Name.LocalName.Equals("link", StringComparison.OrdinalIgnoreCase));
-        return link?.Attribute("href")?.Value;
-    }
-
-    private static DateTimeOffset? ParseDate(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
+        if (string.IsNullOrWhiteSpace(error))
         {
-            return null;
+            state.LastSuccessAt = state.LastFetchAt;
+            state.LastError = null;
+            state.FailureCount = 0;
         }
-
-        if (DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed))
+        else
         {
-            return parsed;
+            state.LastError = error.Length > 1000 ? error[..1000] : error;
+            state.FailureCount += 1;
         }
 
-        return null;
-    }
-
-    private static string? GuessSeverity(string title, string? summary)
-    {
-        var content = $"{title} {summary}".ToLowerInvariant();
-        foreach (var keyword in SeverityKeywords)
-        {
-            if (content.Contains(keyword, StringComparison.OrdinalIgnoreCase))
-            {
-                return keyword;
-            }
-        }
-
-        return "info";
-    }
-
-    private static string? GuessCategory(string title, string? summary)
-    {
-        var content = $"{title} {summary}".ToLowerInvariant();
-        if (content.Contains("maintenance"))
-        {
-            return "maintenance";
-        }
-        if (content.Contains("outage") || content.Contains("disruption"))
-        {
-            return "outage";
-        }
-        if (content.Contains("degraded"))
-        {
-            return "degraded";
-        }
-        if (content.Contains("incident") || content.Contains("investigating"))
-        {
-            return "incident";
-        }
-
-        return "notice";
-    }
-
-    private static string? ExtractRegion(string title, string? summary)
-    {
-        var content = $"{title} {summary}";
-        var match = System.Text.RegularExpressions.Regex.Match(content, @"\b([a-z]{2}-[a-z]+-\d)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        if (match.Success)
-        {
-            return match.Groups[1].Value;
-        }
-
-        return null;
-    }
-
-    private static string? BuildTags(string title, string? summary, string? severity, string? category)
-    {
-        var tags = new List<string>();
-        if (!string.IsNullOrWhiteSpace(severity))
-        {
-            tags.Add(severity);
-        }
-
-        if (!string.IsNullOrWhiteSpace(category) && !tags.Any(tag => string.Equals(tag, category, StringComparison.OrdinalIgnoreCase)))
-        {
-            tags.Add(category);
-        }
-
-        if (title.Contains("region", StringComparison.OrdinalIgnoreCase))
-        {
-            tags.Add("region");
-        }
-
-        if (!string.IsNullOrWhiteSpace(summary) && summary.Contains("latency", StringComparison.OrdinalIgnoreCase))
-        {
-            tags.Add("latency");
-        }
-
-        return tags.Count > 0 ? string.Join(",", tags) : null;
-    }
-
-    private static string? NormalizeText(string? raw)
-    {
-        if (string.IsNullOrWhiteSpace(raw))
-        {
-            return raw;
-        }
-
-        var decoded = WebUtility.HtmlDecode(raw);
-        var withoutTags = Regex.Replace(decoded, "<.*?>", string.Empty, RegexOptions.Singleline);
-        return withoutTags.Trim();
+        await db.SaveChangesAsync(cancellationToken);
     }
 }
