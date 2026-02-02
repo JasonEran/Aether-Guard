@@ -1,4 +1,4 @@
-import type { Agent, AuditLog } from '../types';
+import type { Agent, AuditLog, ExternalSignal, ExternalSignalFeedState } from '../types';
 
 export interface RiskPoint {
   timestamp: string;
@@ -165,5 +165,36 @@ export async function sendChaosSignal(): Promise<void> {
   if (!response.ok) {
     const message = await response.text();
     throw new Error(message || 'Chaos signal failed.');
+  }
+}
+
+export async function fetchExternalSignals(limit = 6): Promise<ExternalSignal[]> {
+  try {
+    const params = new URLSearchParams({ limit: limit.toString() });
+    const response = await fetch(`/api/signals?${params.toString()}`, { cache: 'no-store' });
+    if (!response.ok) {
+      return [];
+    }
+
+    const data = (await response.json()) as ExternalSignal[];
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('[Dashboard] Failed to fetch external signals', error);
+    return [];
+  }
+}
+
+export async function fetchExternalSignalFeeds(): Promise<ExternalSignalFeedState[]> {
+  try {
+    const response = await fetch('/api/signals/feeds', { cache: 'no-store' });
+    if (!response.ok) {
+      return [];
+    }
+
+    const data = (await response.json()) as ExternalSignalFeedState[];
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('[Dashboard] Failed to fetch external signal feeds', error);
+    return [];
   }
 }
