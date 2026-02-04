@@ -21,6 +21,8 @@ services:
       ArtifactBaseUrl: "https://core-service:8443"
       Security__Mtls__Enabled: "true"
       Security__Mtls__Port: "8443"
+      Security__Mtls__AllowHttp: "true"
+      Security__Mtls__HttpPort: "8080"
       Security__Mtls__CertificatePath: "/run/spiffe/certs/svid.pem"
       Security__Mtls__KeyPath: "/run/spiffe/certs/svid_key.pem"
       Security__Mtls__BundlePath: "/run/spiffe/certs/bundle.pem"

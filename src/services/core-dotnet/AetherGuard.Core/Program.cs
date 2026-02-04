@@ -28,6 +28,11 @@ if (mtlsOptions.Enabled)
 
     builder.WebHost.ConfigureKestrel(options =>
     {
+        if (mtlsOptions.AllowHttp)
+        {
+            options.ListenAnyIP(mtlsOptions.HttpPort);
+        }
+
         options.ListenAnyIP(mtlsOptions.Port, listenOptions =>
         {
             listenOptions.UseHttps(httpsOptions =>

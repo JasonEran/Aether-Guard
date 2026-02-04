@@ -358,7 +358,8 @@ sidecars to issue and rotate X.509 SVIDs:
 
 - Core serves mTLS on `https://core-service:8443` (host-mapped to 5001).
 - Agent uses SPIFFE-issued certs from `/run/spiffe/certs` and calls the mTLS endpoint.
-- HTTP on `http://core-service:8080` remains for dashboard/AI traffic.
+- When `Security__Mtls__AllowHttp=true`, Core also listens on `http://core-service:8080` for
+  dashboard/AI traffic (host-mapped to 5000).
 
 Disable mTLS locally by setting:
 

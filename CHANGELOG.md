@@ -20,6 +20,7 @@ Semantic Versioning.
 - v2.3 delivery roadmap in `docs/ROADMAP-v2.3.md`.
 - Expanded v2.3 roadmap with model choices, data sources, and validation guidance.
 - Verification scripts now support API key headers and optional agent build flags.
+- Optional HTTP listener when mTLS is enabled to keep dashboard/AI traffic on port 8080.
 
 ### Changed
 - Agent now injects W3C trace headers for HTTP requests.
