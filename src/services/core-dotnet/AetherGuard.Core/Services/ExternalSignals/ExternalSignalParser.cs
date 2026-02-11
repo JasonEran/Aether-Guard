@@ -8,18 +8,9 @@ namespace AetherGuard.Core.Services.ExternalSignals;
 
 public static class ExternalSignalParser
 {
-    private static readonly string[] SeverityKeywords =
-    [
-        "outage",
-        "degraded",
-        "disruption",
-        "investigating",
-        "incident",
-        "partial",
-        "unavailable",
-        "restored",
-        "resolved"
-    ];
+    private static readonly string[] CriticalKeywords = ["outage", "disruption", "unavailable"];
+    private static readonly string[] WarningKeywords = ["degraded", "incident", "investigating", "partial"];
+    private static readonly string[] InfoKeywords = ["maintenance", "resolved", "restored", "notice"];
 
     public static List<ExternalSignal> ParseFeed(string content, ExternalSignalFeedOptions feed)
     {
@@ -60,9 +51,9 @@ public static class ExternalSignalParser
                 ?? ParseDate(GetValue(item, "published"))
                 ?? DateTimeOffset.UtcNow;
 
-            var severity = GuessSeverity(title, summary);
-            var category = GuessCategory(title, summary);
-            var region = ExtractRegion(title, summary) ?? feed.DefaultRegion;
+            var severity = NormalizeSeverity(title, summary);
+            var category = NormalizeCategory(title, summary);
+            var region = NormalizeRegion(ExtractRegion(title, summary) ?? feed.DefaultRegion);
 
             signals.Add(new ExternalSignal
             {
@@ -109,21 +100,34 @@ public static class ExternalSignalParser
         return null;
     }
 
-    private static string? GuessSeverity(string title, string? summary)
+    private static string? NormalizeSeverity(string title, string? summary)
     {
         var content = $"{title} {summary}".ToLowerInvariant();
-        foreach (var keyword in SeverityKeywords)
+        if (CriticalKeywords.Any(keyword => content.Contains(keyword, StringComparison.OrdinalIgnoreCase)))
         {
-            if (content.Contains(keyword, StringComparison.OrdinalIgnoreCase))
-            {
-                return keyword;
-            }
+            return "critical";
+        }
+
+        if (content.Contains("resolved", StringComparison.OrdinalIgnoreCase)
+            || content.Contains("restored", StringComparison.OrdinalIgnoreCase))
+        {
+            return "info";
+        }
+
+        if (WarningKeywords.Any(keyword => content.Contains(keyword, StringComparison.OrdinalIgnoreCase)))
+        {
+            return "warning";
+        }
+
+        if (InfoKeywords.Any(keyword => content.Contains(keyword, StringComparison.OrdinalIgnoreCase)))
+        {
+            return "info";
         }
 
         return "info";
     }
 
-    private static string? GuessCategory(string title, string? summary)
+    private static string? NormalizeCategory(string title, string? summary)
     {
         var content = $"{title} {summary}".ToLowerInvariant();
         if (content.Contains("maintenance"))
@@ -153,12 +157,7 @@ public static class ExternalSignalParser
             content,
             @"\b([a-z]{2}-[a-z]+-\d|[a-z]{2}-[a-z]+[0-9])\b",
             RegexOptions.IgnoreCase);
-        if (match.Success)
-        {
-            return match.Groups[1].Value;
-        }
-
-        return null;
+        return match.Success ? match.Groups[1].Value : null;
     }
 
     private static string? BuildTags(string title, string? summary, string? severity, string? category)
@@ -166,12 +165,12 @@ public static class ExternalSignalParser
         var tags = new List<string>();
         if (!string.IsNullOrWhiteSpace(severity))
         {
-            tags.Add(severity);
+            tags.Add(severity.ToLowerInvariant());
         }
 
         if (!string.IsNullOrWhiteSpace(category) && !tags.Any(tag => string.Equals(tag, category, StringComparison.OrdinalIgnoreCase)))
         {
-            tags.Add(category);
+            tags.Add(category.ToLowerInvariant());
         }
 
         if (title.Contains("region", StringComparison.OrdinalIgnoreCase))
@@ -184,7 +183,17 @@ public static class ExternalSignalParser
             tags.Add("latency");
         }
 
-        return tags.Count > 0 ? string.Join(",", tags) : null;
+        return tags.Count > 0 ? string.Join(",", tags.Distinct(StringComparer.OrdinalIgnoreCase)) : null;
+    }
+
+    private static string? NormalizeRegion(string? region)
+    {
+        if (string.IsNullOrWhiteSpace(region))
+        {
+            return null;
+        }
+
+        return region.Trim().ToLowerInvariant();
     }
 
     private static string? NormalizeText(string? raw)

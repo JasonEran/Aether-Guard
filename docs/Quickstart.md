@@ -26,6 +26,7 @@ docker compose up --build -d
 ```
 
 For SPIRE-based mTLS details, see `docs/SPIRE-mTLS.md`.
+For SPIRE join-token recovery, see `docs/Runbook-SPIRE-JoinToken.md`.
 For observability setup, see `docs/Observability.md`.
 
 Open the dashboard at `http://localhost:3000` and log in with:
@@ -42,8 +43,13 @@ External signals ingestion is disabled by default. To enable:
 ```bash
 # PowerShell
 $env:ExternalSignals__Enabled="true"
+# Optional retention tuning
+$env:ExternalSignals__RetentionDays="30"
+$env:ExternalSignals__CleanupBatchSize="500"
 # Bash
 export ExternalSignals__Enabled=true
+export ExternalSignals__RetentionDays=30
+export ExternalSignals__CleanupBatchSize=500
 ```
 
 Then restart the core service. Signals are accessible via:
@@ -57,6 +63,8 @@ Feed health status is available via:
 ```
 GET /api/v1/signals/feeds
 ```
+
+Smoke test checklist: `docs/QA-SmokeTest-v2.3.md`.
 
 If you want to simulate migrations, start at least two agents:
 

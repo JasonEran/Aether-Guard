@@ -134,6 +134,8 @@ public sealed class ExternalSignalIngestionService : BackgroundService
 
             _logger.LogInformation("Ingested {Count} signals from {Feed}.", newSignals.Count, feed.Name);
         }
+
+        await CleanupOldSignalsAsync(db, cancellationToken);
     }
 
     private static async Task UpdateFeedStateAsync(
@@ -173,5 +175,48 @@ public sealed class ExternalSignalIngestionService : BackgroundService
         }
 
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task CleanupOldSignalsAsync(ApplicationDbContext db, CancellationToken cancellationToken)
+    {
+        if (_options.RetentionDays <= 0)
+        {
+            return;
+        }
+
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-_options.RetentionDays);
+        var batchSize = Math.Clamp(_options.CleanupBatchSize, 50, 2000);
+        var totalRemoved = 0;
+
+        while (true)
+        {
+            var ids = await db.ExternalSignals
+                .AsNoTracking()
+                .Where(signal => signal.PublishedAt < cutoff)
+                .OrderBy(signal => signal.PublishedAt)
+                .Select(signal => signal.Id)
+                .Take(batchSize)
+                .ToListAsync(cancellationToken);
+
+            if (ids.Count == 0)
+            {
+                break;
+            }
+
+            var toRemove = ids.Select(id => new ExternalSignal { Id = id }).ToList();
+            db.ExternalSignals.RemoveRange(toRemove);
+            var removed = await db.SaveChangesAsync(cancellationToken);
+            totalRemoved += removed;
+
+            if (ids.Count < batchSize)
+            {
+                break;
+            }
+        }
+
+        if (totalRemoved > 0)
+        {
+            _logger.LogInformation("Removed {Count} external signals older than {Cutoff}.", totalRemoved, cutoff);
+        }
     }
 }

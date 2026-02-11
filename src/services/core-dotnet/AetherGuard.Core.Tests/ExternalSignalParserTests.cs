@@ -36,6 +36,7 @@ public class ExternalSignalParserTests
         Assert.Equal("aws-1", results[0].ExternalId);
         Assert.Equal("aws-status", results[0].Source);
         Assert.Equal("us-east-1", results[0].Region);
+        Assert.Equal("critical", results[0].Severity);
     }
 
     [Fact]
@@ -67,5 +68,6 @@ public class ExternalSignalParserTests
         Assert.Equal("gcp-status", results[0].Source);
         Assert.Equal("us-central1", results[0].Region);
         Assert.Equal("incident", results[0].Category);
+        Assert.Equal("info", results[0].Severity);
     }
 }
