@@ -16,6 +16,7 @@ from model import RiskScorer
 
 logger = logging.getLogger("uvicorn.error")
 scorer = RiskScorer()
+ENRICHMENT_SCHEMA_VERSION = "1.0"
 
 
 @asynccontextmanager
@@ -53,9 +54,19 @@ class EnrichRequest(BaseModel):
 
 
 class EnrichResponse(BaseModel):
-    s_v: list[float] = Field(alias="S_v")
-    p_v: float = Field(alias="P_v")
-    b_s: float = Field(alias="B_s")
+    schema_version: str = Field(alias="schemaVersion", description="Semantic vector schema version.")
+    s_v: list[float] = Field(
+        alias="S_v",
+        description="Sentiment vector (normalized polarity + severity).",
+    )
+    p_v: float = Field(
+        alias="P_v",
+        description="Volatility probability in the range [0, 1].",
+    )
+    b_s: float = Field(
+        alias="B_s",
+        description="Supply or capacity bias (long-horizon signal).",
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -104,7 +115,19 @@ def enrich_signals(payload: EnrichRequest) -> EnrichResponse:
         p_v = 0.85
         b_s = 0.2
 
-    return EnrichResponse(S_v=s_v, P_v=p_v, B_s=b_s)
+    return EnrichResponse(schemaVersion=ENRICHMENT_SCHEMA_VERSION, S_v=s_v, P_v=p_v, B_s=b_s)
+
+
+@app.get("/signals/enrich/schema")
+def enrich_schema() -> dict:
+    return {
+        "schemaVersion": ENRICHMENT_SCHEMA_VERSION,
+        "fields": {
+            "S_v": "Sentiment vector (normalized polarity + severity).",
+            "P_v": "Volatility probability in [0, 1].",
+            "B_s": "Supply or capacity bias (long-horizon signal).",
+        },
+    }
 
 def configure_tracing() -> None:
     endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
