@@ -61,6 +61,7 @@ builder.Services.AddHttpClient("external-signals", client =>
     client.DefaultRequestHeaders.UserAgent.ParseAdd("Aether-Guard/ExternalSignals");
     client.Timeout = TimeSpan.FromSeconds(15);
 });
+builder.Services.AddHttpClient<AetherGuard.Core.Services.ExternalSignals.ExternalSignalEnrichmentClient>();
 builder.Services.AddScoped<AgentWorkflowService>();
 builder.Services.AddScoped<TelemetryIngestionService>();
 builder.Services.AddScoped<ControlPlaneService>();

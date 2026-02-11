@@ -133,10 +133,114 @@ public sealed class ExternalSignalIngestionService : BackgroundService
             await db.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation("Ingested {Count} signals from {Feed}.", newSignals.Count, feed.Name);
+
+            if (_options.Enrichment.Enabled)
+            {
+                var enrichmentClient = scope.ServiceProvider.GetRequiredService<ExternalSignalEnrichmentClient>();
+                await EnrichSignalsAsync(db, enrichmentClient, newSignals, cancellationToken);
+            }
         }
 
         await CleanupOldSignalsAsync(db, cancellationToken);
     }
+
+    private async Task EnrichSignalsAsync(
+        ApplicationDbContext db,
+        ExternalSignalEnrichmentClient client,
+        List<ExternalSignal> signals,
+        CancellationToken cancellationToken)
+    {
+        if (!client.IsEnabled || signals.Count == 0)
+        {
+            return;
+        }
+
+        var batch = signals.Take(client.MaxBatchSize).ToList();
+        if (batch.Count == 0)
+        {
+            return;
+        }
+
+        var summaryUpdates = 0;
+        var enrichmentUpdates = 0;
+        var summarizedAt = DateTimeOffset.UtcNow;
+
+        var summaryResponse = await client.SummarizeAsync(batch, cancellationToken);
+        if (summaryResponse is not null)
+        {
+            var summaryByIndex = summaryResponse.Summaries
+                .Where(item => item.Index >= 0 && item.Index < batch.Count)
+                .GroupBy(item => item.Index)
+                .ToDictionary(group => group.Key, group => group.First());
+
+            for (var index = 0; index < batch.Count; index++)
+            {
+                if (!summaryByIndex.TryGetValue(index, out var item))
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(item.Summary))
+                {
+                    continue;
+                }
+
+                var signal = batch[index];
+                signal.SummaryDigest = item.Summary;
+                signal.SummaryDigestTruncated = item.Truncated;
+                signal.SummarySchemaVersion = summaryResponse.SchemaVersion;
+                signal.SummarizedAt = summarizedAt;
+                summaryUpdates++;
+            }
+        }
+
+        var semaphore = new SemaphoreSlim(client.MaxConcurrency);
+        var tasks = batch.Select(async signal =>
+        {
+            await semaphore.WaitAsync(cancellationToken);
+            try
+            {
+                var result = await client.EnrichAsync(signal, cancellationToken);
+                return (signal, result);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }).ToList();
+
+        var results = await Task.WhenAll(tasks);
+        var enrichedAt = DateTimeOffset.UtcNow;
+
+        foreach (var (signal, result) in results)
+        {
+            if (result is null || result.SentimentVector.Length < 3)
+            {
+                continue;
+            }
+
+            signal.SentimentNegative = Clamp01(result.SentimentVector[0]);
+            signal.SentimentNeutral = Clamp01(result.SentimentVector[1]);
+            signal.SentimentPositive = Clamp01(result.SentimentVector[2]);
+            signal.VolatilityProbability = Clamp01(result.VolatilityProbability);
+            signal.SupplyBias = Clamp01(result.SupplyBias);
+            signal.EnrichmentSchemaVersion = result.SchemaVersion;
+            signal.EnrichedAt = enrichedAt;
+            enrichmentUpdates++;
+        }
+
+        if (summaryUpdates > 0 || enrichmentUpdates > 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation(
+                "Enriched external signals: summaries={SummaryCount}, vectors={VectorCount}.",
+                summaryUpdates,
+                enrichmentUpdates);
+        }
+    }
+
+    private static double Clamp01(double value)
+        => Math.Clamp(value, 0.0, 1.0);
 
     private static async Task UpdateFeedStateAsync(
         ApplicationDbContext db,

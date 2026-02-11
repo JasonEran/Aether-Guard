@@ -81,6 +81,17 @@ export AI_ENRICH_PROVIDER=finbert
 export AI_FINBERT_MODEL=ProsusAI/finbert
 ```
 
+Core will call the AI engine for enrichment when external signals are enabled.
+If the AI engine is not running at the default Docker host (`http://ai-service:8000`), override:
+
+```bash
+# PowerShell
+$env:ExternalSignals__Enrichment__BaseUrl="http://localhost:8000"
+
+# Bash
+export ExternalSignals__Enrichment__BaseUrl=http://localhost:8000
+```
+
 Note: the first FinBERT run downloads model weights and can take a few minutes.
 Set `AI_ENRICH_PROVIDER=heuristic` if you need a fast, offline fallback.
 

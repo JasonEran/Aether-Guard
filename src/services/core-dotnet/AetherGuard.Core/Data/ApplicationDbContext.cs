@@ -101,6 +101,17 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.ExternalId).HasColumnName("external_id");
             entity.Property(e => e.Title).HasColumnName("title");
             entity.Property(e => e.Summary).HasColumnName("summary");
+            entity.Property(e => e.SummaryDigest).HasColumnName("summary_digest");
+            entity.Property(e => e.SummaryDigestTruncated).HasColumnName("summary_digest_truncated");
+            entity.Property(e => e.SummarySchemaVersion).HasColumnName("summary_schema_version");
+            entity.Property(e => e.EnrichmentSchemaVersion).HasColumnName("enrichment_schema_version");
+            entity.Property(e => e.SentimentNegative).HasColumnName("sentiment_negative");
+            entity.Property(e => e.SentimentNeutral).HasColumnName("sentiment_neutral");
+            entity.Property(e => e.SentimentPositive).HasColumnName("sentiment_positive");
+            entity.Property(e => e.VolatilityProbability).HasColumnName("volatility_probability");
+            entity.Property(e => e.SupplyBias).HasColumnName("supply_bias");
+            entity.Property(e => e.SummarizedAt).HasColumnName("summarized_at");
+            entity.Property(e => e.EnrichedAt).HasColumnName("enriched_at");
             entity.Property(e => e.Region).HasColumnName("region");
             entity.Property(e => e.Severity).HasColumnName("severity");
             entity.Property(e => e.Category).HasColumnName("category");
