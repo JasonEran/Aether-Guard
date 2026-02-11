@@ -90,6 +90,40 @@ Schema details:
 GET /signals/enrich/schema
 ```
 
+## Optional: Enable summarization (v2.3 Milestone 1)
+
+The AI engine can summarize long advisories with a built-in heuristic summarizer or a remote HTTP summarizer.
+
+```bash
+# PowerShell
+$env:AI_SUMMARIZER_PROVIDER="heuristic"   # or "http"
+$env:AI_SUMMARIZER_ENDPOINT="https://summarizer.example/api" # required for http
+$env:AI_SUMMARIZER_MAX_CHARS="600"
+$env:AI_SUMMARIZER_CACHE_SIZE="1024"
+$env:AI_SUMMARIZER_TIMEOUT="8"
+
+# Bash
+export AI_SUMMARIZER_PROVIDER=heuristic
+export AI_SUMMARIZER_ENDPOINT=https://summarizer.example/api
+export AI_SUMMARIZER_MAX_CHARS=600
+export AI_SUMMARIZER_CACHE_SIZE=1024
+export AI_SUMMARIZER_TIMEOUT=8
+```
+
+Summarize signals:
+
+```
+POST /signals/summarize
+```
+
+Example payload:
+
+```bash
+curl -X POST http://localhost:8000/signals/summarize \
+  -H "Content-Type: application/json" \
+  -d '{"documents":[{"source":"aws","title":"AWS incident update","summary":"Service degradation observed in us-east-1..."}],"maxChars":280}'
+```
+
 If you want to simulate migrations, start at least two agents:
 
 ```bash

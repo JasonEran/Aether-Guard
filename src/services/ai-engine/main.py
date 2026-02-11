@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from functools import lru_cache
@@ -20,11 +21,17 @@ from model import RiskScorer
 logger = logging.getLogger("uvicorn.error")
 scorer = RiskScorer()
 ENRICHMENT_SCHEMA_VERSION = "1.0"
+SUMMARY_SCHEMA_VERSION = "1.0"
 
 DEFAULT_FINBERT_MODEL = os.getenv("AI_FINBERT_MODEL", "ProsusAI/finbert")
 ENRICHMENT_PROVIDER = os.getenv("AI_ENRICH_PROVIDER", "finbert").lower()
 ENRICHMENT_MAX_CHARS = int(os.getenv("AI_ENRICH_MAX_CHARS", "2000"))
 ENRICHMENT_CACHE_SIZE = int(os.getenv("AI_ENRICH_CACHE_SIZE", "1024"))
+SUMMARY_PROVIDER = os.getenv("AI_SUMMARIZER_PROVIDER", "heuristic").lower()
+SUMMARY_ENDPOINT = os.getenv("AI_SUMMARIZER_ENDPOINT", "")
+SUMMARY_MAX_CHARS = int(os.getenv("AI_SUMMARIZER_MAX_CHARS", "600"))
+SUMMARY_CACHE_SIZE = int(os.getenv("AI_SUMMARIZER_CACHE_SIZE", "1024"))
+SUMMARY_TIMEOUT_SECONDS = float(os.getenv("AI_SUMMARIZER_TIMEOUT", "8"))
 
 
 @asynccontextmanager
@@ -32,6 +39,7 @@ async def lifespan(app_instance: FastAPI):
     configure_tracing()
     app_instance.state.scorer = scorer
     app_instance.state.enricher = build_enricher()
+    app_instance.state.summarizer = build_summarizer()
     logger.info("AI Engine Online.")
     yield
 
@@ -76,6 +84,28 @@ class EnrichResponse(BaseModel):
         alias="B_s",
         description="Supply or capacity bias (long-horizon signal).",
     )
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class SummarizeRequest(BaseModel):
+    documents: list[SignalDocument]
+    max_chars: int | None = Field(default=None, alias="maxChars")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class SummaryItem(BaseModel):
+    index: int
+    source: str
+    title: str
+    summary: str
+    truncated: bool
+
+
+class SummarizeResponse(BaseModel):
+    schema_version: str = Field(alias="schemaVersion")
+    summaries: list[SummaryItem]
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -140,6 +170,17 @@ class EnrichResult:
 
 class SemanticEnricher:
     def enrich(self, documents: Iterable[SignalDocument]) -> EnrichResult:  # pragma: no cover - interface
+        raise NotImplementedError
+
+
+@dataclass
+class SummarizeResult:
+    summary: str
+    truncated: bool
+
+
+class SignalSummarizer:
+    def summarize(self, text: str, max_chars: int) -> SummarizeResult:  # pragma: no cover - interface
         raise NotImplementedError
 
 
@@ -248,6 +289,97 @@ def build_enricher() -> SemanticEnricher:
     return HeuristicEnricher()
 
 
+class HeuristicSummarizer(SignalSummarizer):
+    def __init__(self, max_chars: int, cache_size: int) -> None:
+        self._max_chars = max_chars
+        self._cache = lru_cache(maxsize=cache_size)(self._summarize_text)
+
+    def summarize(self, text: str, max_chars: int | None = None) -> SummarizeResult:
+        limit = max_chars or self._max_chars
+        clean = normalize_text(text)
+        if not clean:
+            return SummarizeResult(summary="", truncated=False)
+        if limit <= 0:
+            return SummarizeResult(summary="", truncated=len(clean) > 0)
+        return self._cache(clean, limit)
+
+    def _summarize_text(self, text: str, limit: int) -> SummarizeResult:
+        if len(text) <= limit:
+            return SummarizeResult(summary=text, truncated=False)
+
+        sentences = re.split(r"(?<=[.!?])\s+", text)
+        summary_parts: list[str] = []
+        total_len = 0
+        for sentence in sentences:
+            if not sentence:
+                continue
+            next_len = total_len + len(sentence) + (1 if summary_parts else 0)
+            if next_len > limit:
+                break
+            summary_parts.append(sentence)
+            total_len = next_len
+
+        if not summary_parts:
+            return SummarizeResult(summary=text[:limit].rstrip(), truncated=True)
+
+        summary = " ".join(summary_parts).rstrip()
+        return SummarizeResult(summary=summary, truncated=True)
+
+
+class HttpSummarizer(SignalSummarizer):
+    def __init__(self, endpoint: str, fallback: SignalSummarizer, max_chars: int, cache_size: int, timeout: float) -> None:
+        self._endpoint = endpoint
+        self._fallback = fallback
+        self._max_chars = max_chars
+        self._timeout = timeout
+        self._cache = lru_cache(maxsize=cache_size)(self._summarize_remote)
+
+    def summarize(self, text: str, max_chars: int | None = None) -> SummarizeResult:
+        limit = max_chars or self._max_chars
+        clean = normalize_text(text)
+        if not clean:
+            return SummarizeResult(summary="", truncated=False)
+        if limit <= 0:
+            return SummarizeResult(summary="", truncated=len(clean) > 0)
+        return self._cache(clean, limit)
+
+    def _summarize_remote(self, text: str, limit: int) -> SummarizeResult:
+        try:
+            import requests
+
+            response = requests.post(
+                self._endpoint,
+                json={"text": text, "maxChars": limit},
+                timeout=self._timeout,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            summary = str(payload.get("summary", "")).strip()
+            if not summary:
+                return self._fallback.summarize(text, limit)
+            return SummarizeResult(summary=summary, truncated=len(text) > len(summary))
+        except Exception as exc:
+            logger.warning("Summarizer remote call failed, falling back: %s", exc)
+            return self._fallback.summarize(text, limit)
+
+
+def build_summarizer() -> SignalSummarizer:
+    heuristic = HeuristicSummarizer(max_chars=SUMMARY_MAX_CHARS, cache_size=SUMMARY_CACHE_SIZE)
+
+    if SUMMARY_PROVIDER == "http":
+        if SUMMARY_ENDPOINT:
+            return HttpSummarizer(
+                endpoint=SUMMARY_ENDPOINT,
+                fallback=heuristic,
+                max_chars=SUMMARY_MAX_CHARS,
+                cache_size=SUMMARY_CACHE_SIZE,
+                timeout=SUMMARY_TIMEOUT_SECONDS,
+            )
+        logger.warning("AI_SUMMARIZER_PROVIDER=http set but AI_SUMMARIZER_ENDPOINT is empty; using heuristic.")
+
+    return heuristic
+
+
 def normalize_vector(values: list[float]) -> list[float]:
     total = sum(max(0.0, value) for value in values)
     if total <= 0:
@@ -257,6 +389,34 @@ def normalize_vector(values: list[float]) -> list[float]:
 
 def clamp(value: float, min_value: float, max_value: float) -> float:
     return max(min_value, min(max_value, value))
+
+
+def normalize_text(text: str) -> str:
+    return " ".join(text.replace("\n", " ").split()).strip()
+
+
+@app.post("/signals/summarize", response_model=SummarizeResponse)
+def summarize_signals(payload: SummarizeRequest) -> SummarizeResponse:
+    summarizer: SignalSummarizer = app.state.summarizer
+    max_chars = payload.max_chars if payload.max_chars and payload.max_chars > 0 else SUMMARY_MAX_CHARS
+    summaries: list[SummaryItem] = []
+
+    for index, doc in enumerate(payload.documents):
+        source = doc.source
+        title = doc.title
+        text = f"{doc.title}. {doc.summary}" if doc.summary else doc.title
+        result = summarizer.summarize(text, max_chars)
+        summaries.append(
+            SummaryItem(
+                index=index,
+                source=source,
+                title=title,
+                summary=result.summary,
+                truncated=result.truncated,
+            )
+        )
+
+    return SummarizeResponse(schemaVersion=SUMMARY_SCHEMA_VERSION, summaries=summaries)
 
 def configure_tracing() -> None:
     endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
