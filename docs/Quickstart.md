@@ -66,6 +66,30 @@ GET /api/v1/signals/feeds
 
 Smoke test checklist: `docs/QA-SmokeTest-v2.3.md`.
 
+## Optional: Enable semantic enrichment (v2.3 Milestone 1)
+
+The AI engine defaults to a FinBERT-based enricher when dependencies are available.
+You can force the provider via environment variables:
+
+```bash
+# PowerShell
+$env:AI_ENRICH_PROVIDER="finbert"   # or "heuristic"
+$env:AI_FINBERT_MODEL="ProsusAI/finbert"
+
+# Bash
+export AI_ENRICH_PROVIDER=finbert
+export AI_FINBERT_MODEL=ProsusAI/finbert
+```
+
+Note: the first FinBERT run downloads model weights and can take a few minutes.
+Set `AI_ENRICH_PROVIDER=heuristic` if you need a fast, offline fallback.
+
+Schema details:
+
+```
+GET /signals/enrich/schema
+```
+
 If you want to simulate migrations, start at least two agents:
 
 ```bash

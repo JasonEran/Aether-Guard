@@ -37,6 +37,7 @@ minimize integration risk while preserving backward compatibility with the v2.2 
 
 - Enrichment throughput supports expected signal volume.
 - Outputs are versioned and validated.
+- FinBERT/semantic enrichment is operational (with heuristic fallback).
 
 ### Milestone 2: Fusion and Forecasting (Offline)
 
