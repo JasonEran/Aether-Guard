@@ -14,6 +14,7 @@ minimize integration risk while preserving backward compatibility with the v2.2 
 ### Milestone 0: Data Foundation (Signals Ingestion)
 
 **Goal**: Introduce external cloud signals and store them alongside telemetry windows.
+**Status**: Completed (2026-02-11)
 
 - Add connectors for provider status feeds and incident streams.
 - Normalize signal schema (timestamp, region, severity, source, summary).
@@ -27,6 +28,7 @@ minimize integration risk while preserving backward compatibility with the v2.2 
 ### Milestone 1: Semantic Enrichment Service
 
 **Goal**: Extract semantic vectors from signals without impacting core latency.
+**Status**: Completed (2026-02-19)
 
 - Add NLP service for incident sentiment and volatility likelihood (FinBERT or domain BERT).
 - Add LLM summarizer for longer advisories and policy updates.

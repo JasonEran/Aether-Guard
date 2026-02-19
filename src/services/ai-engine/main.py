@@ -74,16 +74,53 @@ class EnrichResponse(BaseModel):
     schema_version: str = Field(alias="schemaVersion", description="Semantic vector schema version.")
     s_v: list[float] = Field(
         alias="S_v",
+        min_length=3,
+        max_length=3,
         description="Sentiment vector [negative, neutral, positive], normalized to sum to 1.",
     )
     p_v: float = Field(
         alias="P_v",
+        ge=0.0,
+        le=1.0,
         description="Volatility probability in the range [0, 1].",
     )
     b_s: float = Field(
         alias="B_s",
+        ge=0.0,
+        le=1.0,
         description="Supply or capacity bias (long-horizon signal).",
     )
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class EnrichBatchItem(BaseModel):
+    index: int = Field(ge=0)
+    s_v: list[float] = Field(
+        alias="S_v",
+        min_length=3,
+        max_length=3,
+        description="Sentiment vector [negative, neutral, positive], normalized to sum to 1.",
+    )
+    p_v: float = Field(
+        alias="P_v",
+        ge=0.0,
+        le=1.0,
+        description="Volatility probability in the range [0, 1].",
+    )
+    b_s: float = Field(
+        alias="B_s",
+        ge=0.0,
+        le=1.0,
+        description="Supply or capacity bias (long-horizon signal).",
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class EnrichBatchResponse(BaseModel):
+    schema_version: str = Field(alias="schemaVersion", description="Semantic vector schema version.")
+    vectors: list[EnrichBatchItem]
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -140,7 +177,7 @@ def analyze(payload: RiskPayload) -> dict:
 @app.post("/signals/enrich", response_model=EnrichResponse)
 def enrich_signals(payload: EnrichRequest) -> EnrichResponse:
     enricher: SemanticEnricher = app.state.enricher
-    result = enricher.enrich(payload.documents)
+    result = sanitize_enrich_result(enricher.enrich(payload.documents))
     return EnrichResponse(
         schemaVersion=ENRICHMENT_SCHEMA_VERSION,
         S_v=result.s_v,
@@ -149,10 +186,32 @@ def enrich_signals(payload: EnrichRequest) -> EnrichResponse:
     )
 
 
+@app.post("/signals/enrich/batch", response_model=EnrichBatchResponse)
+def enrich_signals_batch(payload: EnrichRequest) -> EnrichBatchResponse:
+    enricher: SemanticEnricher = app.state.enricher
+    vectors = [
+        EnrichBatchItem(
+            index=index,
+            S_v=result.s_v,
+            P_v=result.p_v,
+            B_s=result.b_s,
+        )
+        for index, result in enumerate(
+            [sanitize_enrich_result(result) for result in enricher.enrich_batch(payload.documents)]
+        )
+    ]
+
+    return EnrichBatchResponse(
+        schemaVersion=ENRICHMENT_SCHEMA_VERSION,
+        vectors=vectors,
+    )
+
+
 @app.get("/signals/enrich/schema")
 def enrich_schema() -> dict:
     return {
         "schemaVersion": ENRICHMENT_SCHEMA_VERSION,
+        "batchEndpoint": "/signals/enrich/batch",
         "fields": {
             "S_v": "Sentiment vector [negative, neutral, positive], normalized to sum to 1.",
             "P_v": "Volatility probability in [0, 1].",
@@ -172,6 +231,9 @@ class SemanticEnricher:
     def enrich(self, documents: Iterable[SignalDocument]) -> EnrichResult:  # pragma: no cover - interface
         raise NotImplementedError
 
+    def enrich_batch(self, documents: Iterable[SignalDocument]) -> list[EnrichResult]:
+        return [self.enrich([document]) for document in documents]
+
 
 @dataclass
 class SummarizeResult:
@@ -189,7 +251,18 @@ class HeuristicEnricher(SemanticEnricher):
     supply_terms = ("capacity", "shortage", "procurement", "inventory", "supply", "quota")
 
     def enrich(self, documents: Iterable[SignalDocument]) -> EnrichResult:
-        combined = " ".join([self._doc_text(doc) for doc in documents]).lower()
+        document_list = list(documents)
+        if not document_list:
+            return EnrichResult(s_v=[0.15, 0.7, 0.15], p_v=0.1, b_s=0.0)
+
+        # Keep the legacy aggregate behavior for backward compatibility.
+        combined = " ".join([self._doc_text(doc) for doc in document_list]).lower()
+        return self._score_text(combined)
+
+    def enrich_batch(self, documents: Iterable[SignalDocument]) -> list[EnrichResult]:
+        return [self._score_text(self._doc_text(document).lower()) for document in documents]
+
+    def _score_text(self, combined: str) -> EnrichResult:
         negative_hits = sum(term in combined for term in self.negative_terms)
         supply_hits = sum(term in combined for term in self.supply_terms)
 
@@ -225,7 +298,8 @@ class FinbertEnricher(SemanticEnricher):
         self._cache = lru_cache(maxsize=cache_size)(self._score_text)
 
     def enrich(self, documents: Iterable[SignalDocument]) -> EnrichResult:
-        scores = [self._cache(self._doc_text(doc)) for doc in documents]
+        document_list = list(documents)
+        scores = [self._cache(self._doc_text(doc)) for doc in document_list]
         if not scores:
             return EnrichResult(s_v=[0.15, 0.7, 0.15], p_v=0.1, b_s=0.0)
 
@@ -236,8 +310,19 @@ class FinbertEnricher(SemanticEnricher):
 
         volatility_boost = max(0.0, neg - pos)
         p_v = clamp(0.1 + volatility_boost * 1.2, 0.0, 1.0)
-        b_s = clamp(self._supply_bias(documents), 0.0, 1.0)
+        b_s = clamp(self._supply_bias(document_list), 0.0, 1.0)
         return EnrichResult(s_v=s_v, p_v=p_v, b_s=b_s)
+
+    def enrich_batch(self, documents: Iterable[SignalDocument]) -> list[EnrichResult]:
+        results: list[EnrichResult] = []
+        for document in documents:
+            scores = self._cache(self._doc_text(document))
+            neg = scores[0]
+            pos = scores[2]
+            p_v = clamp(0.1 + max(0.0, neg - pos) * 1.2, 0.0, 1.0)
+            b_s = clamp(self._supply_bias([document]), 0.0, 1.0)
+            results.append(EnrichResult(s_v=scores, p_v=p_v, b_s=b_s))
+        return results
 
     def _score_text(self, text: str) -> list[float]:
         scores_raw = self._pipeline(text[: self._max_chars])
@@ -389,6 +474,15 @@ def normalize_vector(values: list[float]) -> list[float]:
 
 def clamp(value: float, min_value: float, max_value: float) -> float:
     return max(min_value, min(max_value, value))
+
+
+def sanitize_enrich_result(result: EnrichResult) -> EnrichResult:
+    values = normalize_vector((result.s_v + [0.0, 0.0, 0.0])[:3])
+    return EnrichResult(
+        s_v=values,
+        p_v=clamp(result.p_v, 0.0, 1.0),
+        b_s=clamp(result.b_s, 0.0, 1.0),
+    )
 
 
 def normalize_text(text: str) -> str:

@@ -194,39 +194,60 @@ public sealed class ExternalSignalIngestionService : BackgroundService
             }
         }
 
-        var semaphore = new SemaphoreSlim(client.MaxConcurrency);
-        var tasks = batch.Select(async signal =>
-        {
-            await semaphore.WaitAsync(cancellationToken);
-            try
-            {
-                var result = await client.EnrichAsync(signal, cancellationToken);
-                return (signal, result);
-            }
-            finally
-            {
-                semaphore.Release();
-            }
-        }).ToList();
-
-        var results = await Task.WhenAll(tasks);
         var enrichedAt = DateTimeOffset.UtcNow;
+        var batchResponse = await client.EnrichBatchAsync(batch, cancellationToken);
 
-        foreach (var (signal, result) in results)
+        if (batchResponse is not null)
         {
-            if (result is null || result.SentimentVector.Length < 3)
-            {
-                continue;
-            }
+            var vectorsByIndex = batchResponse.Vectors
+                .Where(item => item.Index >= 0 && item.Index < batch.Count)
+                .GroupBy(item => item.Index)
+                .ToDictionary(group => group.Key, group => group.First().Vector);
 
-            signal.SentimentNegative = Clamp01(result.SentimentVector[0]);
-            signal.SentimentNeutral = Clamp01(result.SentimentVector[1]);
-            signal.SentimentPositive = Clamp01(result.SentimentVector[2]);
-            signal.VolatilityProbability = Clamp01(result.VolatilityProbability);
-            signal.SupplyBias = Clamp01(result.SupplyBias);
-            signal.EnrichmentSchemaVersion = result.SchemaVersion;
-            signal.EnrichedAt = enrichedAt;
-            enrichmentUpdates++;
+            for (var index = 0; index < batch.Count; index++)
+            {
+                if (!vectorsByIndex.TryGetValue(index, out var vector))
+                {
+                    continue;
+                }
+
+                if (vector.SentimentVector.Length < 3)
+                {
+                    continue;
+                }
+
+                ApplyEnrichment(batch[index], vector, enrichedAt);
+                enrichmentUpdates++;
+            }
+        }
+        else
+        {
+            var semaphore = new SemaphoreSlim(client.MaxConcurrency);
+            var tasks = batch.Select(async signal =>
+            {
+                await semaphore.WaitAsync(cancellationToken);
+                try
+                {
+                    var result = await client.EnrichAsync(signal, cancellationToken);
+                    return (signal, result);
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            }).ToList();
+
+            var results = await Task.WhenAll(tasks);
+            foreach (var (signal, result) in results)
+            {
+                if (result is null || result.SentimentVector.Length < 3)
+                {
+                    continue;
+                }
+
+                ApplyEnrichment(signal, result, enrichedAt);
+                enrichmentUpdates++;
+            }
         }
 
         if (summaryUpdates > 0 || enrichmentUpdates > 0)
@@ -241,6 +262,20 @@ public sealed class ExternalSignalIngestionService : BackgroundService
 
     private static double Clamp01(double value)
         => Math.Clamp(value, 0.0, 1.0);
+
+    private static void ApplyEnrichment(
+        ExternalSignal signal,
+        ExternalSignalEnrichmentClient.EnrichResponse result,
+        DateTimeOffset enrichedAt)
+    {
+        signal.SentimentNegative = Clamp01(result.SentimentVector[0]);
+        signal.SentimentNeutral = Clamp01(result.SentimentVector[1]);
+        signal.SentimentPositive = Clamp01(result.SentimentVector[2]);
+        signal.VolatilityProbability = Clamp01(result.VolatilityProbability);
+        signal.SupplyBias = Clamp01(result.SupplyBias);
+        signal.EnrichmentSchemaVersion = result.SchemaVersion;
+        signal.EnrichedAt = enrichedAt;
+    }
 
     private static async Task UpdateFeedStateAsync(
         ApplicationDbContext db,

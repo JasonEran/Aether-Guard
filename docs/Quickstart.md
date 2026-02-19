@@ -101,6 +101,23 @@ Schema details:
 GET /signals/enrich/schema
 ```
 
+Batch enrichment endpoint (recommended for throughput):
+
+```
+POST /signals/enrich/batch
+```
+
+Example payload:
+
+```bash
+curl -X POST http://localhost:8000/signals/enrich/batch \
+  -H "Content-Type: application/json" \
+  -d '{"documents":[{"source":"aws","title":"Service disruption in us-east-1","summary":"Investigating elevated errors."},{"source":"gcp","title":"RESOLVED: incident in us-central1","summary":"Service recovered."}]}'
+```
+
+Core prefers `/signals/enrich/batch` and falls back to `/signals/enrich` automatically.
+Milestone 1 smoke test checklist: `docs/QA-SmokeTest-v2.3-M1.md`.
+
 ## Optional: Enable summarization (v2.3 Milestone 1)
 
 The AI engine can summarize long advisories with a built-in heuristic summarizer or a remote HTTP summarizer.
