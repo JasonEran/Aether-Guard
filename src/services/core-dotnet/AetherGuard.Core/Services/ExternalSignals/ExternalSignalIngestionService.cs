@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using AetherGuard.Core.Data;
 using AetherGuard.Core.Models;
 using Microsoft.EntityFrameworkCore;
@@ -137,7 +138,7 @@ public sealed class ExternalSignalIngestionService : BackgroundService
             if (_options.Enrichment.Enabled)
             {
                 var enrichmentClient = scope.ServiceProvider.GetRequiredService<ExternalSignalEnrichmentClient>();
-                await EnrichSignalsAsync(db, enrichmentClient, newSignals, cancellationToken);
+                await EnrichSignalsAsync(db, enrichmentClient, newSignals, feed.Name, cancellationToken);
             }
         }
 
@@ -148,6 +149,7 @@ public sealed class ExternalSignalIngestionService : BackgroundService
         ApplicationDbContext db,
         ExternalSignalEnrichmentClient client,
         List<ExternalSignal> signals,
+        string source,
         CancellationToken cancellationToken)
     {
         if (!client.IsEnabled || signals.Count == 0)
@@ -161,102 +163,147 @@ public sealed class ExternalSignalIngestionService : BackgroundService
             return;
         }
 
+        var stopwatch = Stopwatch.StartNew();
+        using var activity = ExternalSignalsTelemetry.ActivitySource.StartActivity(
+            "external_signals.pipeline.enrich",
+            ActivityKind.Internal);
+        activity?.SetTag("external_signals.source", source);
+        activity?.SetTag("external_signals.batch.size", batch.Count);
+
         var summaryUpdates = 0;
         var enrichmentUpdates = 0;
         var summarizedAt = DateTimeOffset.UtcNow;
+        var mode = "batch";
 
-        var summaryResponse = await client.SummarizeAsync(batch, cancellationToken);
-        if (summaryResponse is not null)
+        try
         {
-            var summaryByIndex = summaryResponse.Summaries
-                .Where(item => item.Index >= 0 && item.Index < batch.Count)
-                .GroupBy(item => item.Index)
-                .ToDictionary(group => group.Key, group => group.First());
-
-            for (var index = 0; index < batch.Count; index++)
+            var summaryResponse = await client.SummarizeAsync(batch, cancellationToken);
+            if (summaryResponse is not null)
             {
-                if (!summaryByIndex.TryGetValue(index, out var item))
-                {
-                    continue;
-                }
+                var summaryByIndex = summaryResponse.Summaries
+                    .Where(item => item.Index >= 0 && item.Index < batch.Count)
+                    .GroupBy(item => item.Index)
+                    .ToDictionary(group => group.Key, group => group.First());
 
-                if (string.IsNullOrWhiteSpace(item.Summary))
+                for (var index = 0; index < batch.Count; index++)
                 {
-                    continue;
-                }
+                    if (!summaryByIndex.TryGetValue(index, out var item))
+                    {
+                        continue;
+                    }
 
-                var signal = batch[index];
-                signal.SummaryDigest = item.Summary;
-                signal.SummaryDigestTruncated = item.Truncated;
-                signal.SummarySchemaVersion = summaryResponse.SchemaVersion;
-                signal.SummarizedAt = summarizedAt;
-                summaryUpdates++;
+                    if (string.IsNullOrWhiteSpace(item.Summary))
+                    {
+                        continue;
+                    }
+
+                    var signal = batch[index];
+                    signal.SummaryDigest = item.Summary;
+                    signal.SummaryDigestTruncated = item.Truncated;
+                    signal.SummarySchemaVersion = summaryResponse.SchemaVersion;
+                    signal.SummarizedAt = summarizedAt;
+                    summaryUpdates++;
+                }
             }
-        }
 
-        var enrichedAt = DateTimeOffset.UtcNow;
-        var batchResponse = await client.EnrichBatchAsync(batch, cancellationToken);
+            var enrichedAt = DateTimeOffset.UtcNow;
+            var batchResponse = await client.EnrichBatchAsync(batch, cancellationToken);
 
-        if (batchResponse is not null)
-        {
-            var vectorsByIndex = batchResponse.Vectors
-                .Where(item => item.Index >= 0 && item.Index < batch.Count)
-                .GroupBy(item => item.Index)
-                .ToDictionary(group => group.Key, group => group.First().Vector);
-
-            for (var index = 0; index < batch.Count; index++)
+            if (batchResponse is not null)
             {
-                if (!vectorsByIndex.TryGetValue(index, out var vector))
-                {
-                    continue;
-                }
+                var vectorsByIndex = batchResponse.Vectors
+                    .Where(item => item.Index >= 0 && item.Index < batch.Count)
+                    .GroupBy(item => item.Index)
+                    .ToDictionary(group => group.Key, group => group.First().Vector);
 
-                if (vector.SentimentVector.Length < 3)
+                for (var index = 0; index < batch.Count; index++)
                 {
-                    continue;
-                }
+                    if (!vectorsByIndex.TryGetValue(index, out var vector))
+                    {
+                        continue;
+                    }
 
-                ApplyEnrichment(batch[index], vector, enrichedAt);
-                enrichmentUpdates++;
+                    if (vector.SentimentVector.Length < 3)
+                    {
+                        continue;
+                    }
+
+                    ApplyEnrichment(batch[index], vector, enrichedAt);
+                    enrichmentUpdates++;
+                }
             }
-        }
-        else
-        {
-            var semaphore = new SemaphoreSlim(client.MaxConcurrency);
-            var tasks = batch.Select(async signal =>
+            else
             {
-                await semaphore.WaitAsync(cancellationToken);
-                try
-                {
-                    var result = await client.EnrichAsync(signal, cancellationToken);
-                    return (signal, result);
-                }
-                finally
-                {
-                    semaphore.Release();
-                }
-            }).ToList();
+                mode = "single_fallback";
+                ExternalSignalsTelemetry.RecordPipelineFallback(source, batch.Count, "batch_unavailable");
+                activity?.SetTag("external_signals.fallback", true);
 
-            var results = await Task.WhenAll(tasks);
-            foreach (var (signal, result) in results)
-            {
-                if (result is null || result.SentimentVector.Length < 3)
+                var semaphore = new SemaphoreSlim(client.MaxConcurrency);
+                var tasks = batch.Select(async signal =>
                 {
-                    continue;
-                }
+                    await semaphore.WaitAsync(cancellationToken);
+                    try
+                    {
+                        var result = await client.EnrichAsync(signal, cancellationToken);
+                        return (signal, result);
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }).ToList();
 
-                ApplyEnrichment(signal, result, enrichedAt);
-                enrichmentUpdates++;
+                var results = await Task.WhenAll(tasks);
+                foreach (var (signal, result) in results)
+                {
+                    if (result is null || result.SentimentVector.Length < 3)
+                    {
+                        continue;
+                    }
+
+                    ApplyEnrichment(signal, result, enrichedAt);
+                    enrichmentUpdates++;
+                }
             }
-        }
 
-        if (summaryUpdates > 0 || enrichmentUpdates > 0)
+            if (summaryUpdates > 0 || enrichmentUpdates > 0)
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                _logger.LogInformation(
+                    "Enriched external signals: summaries={SummaryCount}, vectors={VectorCount}.",
+                    summaryUpdates,
+                    enrichmentUpdates);
+            }
+
+            ExternalSignalsTelemetry.RecordPipelineUpdates(source, summaryUpdates, enrichmentUpdates);
+            var outcome = summaryUpdates > 0 || enrichmentUpdates > 0 ? "success" : "no_updates";
+            ExternalSignalsTelemetry.RecordPipelineRun(
+                source,
+                batch.Count,
+                mode,
+                outcome,
+                stopwatch.Elapsed.TotalMilliseconds);
+            activity?.SetTag("external_signals.summary_updates", summaryUpdates);
+            activity?.SetTag("external_signals.vector_updates", enrichmentUpdates);
+            activity?.SetTag("external_signals.mode", mode);
+            activity?.SetStatus(ActivityStatusCode.Ok);
+        }
+        catch (Exception ex)
         {
-            await db.SaveChangesAsync(cancellationToken);
-            _logger.LogInformation(
-                "Enriched external signals: summaries={SummaryCount}, vectors={VectorCount}.",
-                summaryUpdates,
-                enrichmentUpdates);
+            ExternalSignalsTelemetry.RecordPipelineRun(
+                source,
+                batch.Count,
+                mode,
+                "error",
+                stopwatch.Elapsed.TotalMilliseconds);
+            activity?.SetTag("exception.type", ex.GetType().FullName);
+            activity?.SetTag("exception.message", ex.Message);
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            throw;
+        }
+        finally
+        {
+            activity?.SetTag("external_signals.pipeline_duration_ms", stopwatch.Elapsed.TotalMilliseconds);
         }
     }
 

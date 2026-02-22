@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -51,6 +52,9 @@ public sealed class ExternalSignalEnrichmentClient
 
         var documents = signals.Select(MapDocument).ToList();
         var request = new SummarizeRequestDto(documents, SummaryMaxChars);
+        const string operation = "summarize";
+        using var activity = StartClientActivity(operation, documents.Count);
+        var stopwatch = Stopwatch.StartNew();
 
         try
         {
@@ -63,6 +67,14 @@ public sealed class ExternalSignalEnrichmentClient
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Summarizer returned HTTP {StatusCode}.", response.StatusCode);
+                ExternalSignalsTelemetry.RecordClientRequest(
+                    operation,
+                    documents.Count,
+                    "http_error",
+                    stopwatch.Elapsed.TotalMilliseconds,
+                    (int)response.StatusCode);
+                activity?.SetStatus(ActivityStatusCode.Error, "HTTP error");
+                activity?.SetTag("http.status_code", (int)response.StatusCode);
                 return null;
             }
 
@@ -73,14 +85,36 @@ public sealed class ExternalSignalEnrichmentClient
             if (payload?.Summaries is null || payload.Summaries.Count == 0)
             {
                 _logger.LogWarning("Summarizer returned an empty payload.");
+                ExternalSignalsTelemetry.RecordClientRequest(
+                    operation,
+                    documents.Count,
+                    "invalid_payload",
+                    stopwatch.Elapsed.TotalMilliseconds,
+                    (int)response.StatusCode);
+                activity?.SetStatus(ActivityStatusCode.Error, "Invalid payload");
                 return null;
             }
 
+            ExternalSignalsTelemetry.RecordClientRequest(
+                operation,
+                documents.Count,
+                "success",
+                stopwatch.Elapsed.TotalMilliseconds,
+                (int)response.StatusCode);
+            activity?.SetStatus(ActivityStatusCode.Ok);
             return new SummarizeResponse(payload.SchemaVersion ?? "unknown", payload.Summaries);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Summarizer request failed.");
+            ExternalSignalsTelemetry.RecordClientRequest(
+                operation,
+                documents.Count,
+                "exception",
+                stopwatch.Elapsed.TotalMilliseconds);
+            activity?.SetTag("exception.type", ex.GetType().FullName);
+            activity?.SetTag("exception.message", ex.Message);
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             return null;
         }
     }
@@ -93,6 +127,11 @@ public sealed class ExternalSignalEnrichmentClient
         }
 
         var request = new EnrichRequestDto(new[] { MapDocument(signal) });
+        const string operation = "enrich";
+        const int documentCount = 1;
+        using var activity = StartClientActivity(operation, documentCount);
+        activity?.SetTag("external_signals.external_id", signal.ExternalId);
+        var stopwatch = Stopwatch.StartNew();
 
         try
         {
@@ -107,6 +146,14 @@ public sealed class ExternalSignalEnrichmentClient
                 _logger.LogWarning("Enrichment returned HTTP {StatusCode} for signal {ExternalId}.",
                     response.StatusCode,
                     signal.ExternalId);
+                ExternalSignalsTelemetry.RecordClientRequest(
+                    operation,
+                    documentCount,
+                    "http_error",
+                    stopwatch.Elapsed.TotalMilliseconds,
+                    (int)response.StatusCode);
+                activity?.SetStatus(ActivityStatusCode.Error, "HTTP error");
+                activity?.SetTag("http.status_code", (int)response.StatusCode);
                 return null;
             }
 
@@ -123,14 +170,36 @@ public sealed class ExternalSignalEnrichmentClient
                     out var normalized))
             {
                 _logger.LogWarning("Enrichment payload missing S_v for signal {ExternalId}.", signal.ExternalId);
+                ExternalSignalsTelemetry.RecordClientRequest(
+                    operation,
+                    documentCount,
+                    "invalid_payload",
+                    stopwatch.Elapsed.TotalMilliseconds,
+                    (int)response.StatusCode);
+                activity?.SetStatus(ActivityStatusCode.Error, "Invalid payload");
                 return null;
             }
 
+            ExternalSignalsTelemetry.RecordClientRequest(
+                operation,
+                documentCount,
+                "success",
+                stopwatch.Elapsed.TotalMilliseconds,
+                (int)response.StatusCode);
+            activity?.SetStatus(ActivityStatusCode.Ok);
             return normalized;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Enrichment request failed for signal {ExternalId}.", signal.ExternalId);
+            ExternalSignalsTelemetry.RecordClientRequest(
+                operation,
+                documentCount,
+                "exception",
+                stopwatch.Elapsed.TotalMilliseconds);
+            activity?.SetTag("exception.type", ex.GetType().FullName);
+            activity?.SetTag("exception.message", ex.Message);
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             return null;
         }
     }
@@ -150,6 +219,9 @@ public sealed class ExternalSignalEnrichmentClient
             return null;
         }
         var request = new EnrichRequestDto(documents);
+        const string operation = "enrich_batch";
+        using var activity = StartClientActivity(operation, documents.Count);
+        var stopwatch = Stopwatch.StartNew();
 
         try
         {
@@ -162,6 +234,14 @@ public sealed class ExternalSignalEnrichmentClient
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Batch enrichment returned HTTP {StatusCode}.", response.StatusCode);
+                ExternalSignalsTelemetry.RecordClientRequest(
+                    operation,
+                    documents.Count,
+                    "http_error",
+                    stopwatch.Elapsed.TotalMilliseconds,
+                    (int)response.StatusCode);
+                activity?.SetStatus(ActivityStatusCode.Error, "HTTP error");
+                activity?.SetTag("http.status_code", (int)response.StatusCode);
                 return null;
             }
 
@@ -172,6 +252,13 @@ public sealed class ExternalSignalEnrichmentClient
             if (payload?.Vectors is null || payload.Vectors.Count == 0)
             {
                 _logger.LogWarning("Batch enrichment returned an empty payload.");
+                ExternalSignalsTelemetry.RecordClientRequest(
+                    operation,
+                    documents.Count,
+                    "invalid_payload",
+                    stopwatch.Elapsed.TotalMilliseconds,
+                    (int)response.StatusCode);
+                activity?.SetStatus(ActivityStatusCode.Error, "Invalid payload");
                 return null;
             }
 
@@ -195,14 +282,37 @@ public sealed class ExternalSignalEnrichmentClient
             if (vectors.Count == 0)
             {
                 _logger.LogWarning("Batch enrichment payload had no valid vectors.");
+                ExternalSignalsTelemetry.RecordClientRequest(
+                    operation,
+                    documents.Count,
+                    "invalid_payload",
+                    stopwatch.Elapsed.TotalMilliseconds,
+                    (int)response.StatusCode);
+                activity?.SetStatus(ActivityStatusCode.Error, "Invalid payload");
                 return null;
             }
 
+            ExternalSignalsTelemetry.RecordClientRequest(
+                operation,
+                documents.Count,
+                "success",
+                stopwatch.Elapsed.TotalMilliseconds,
+                (int)response.StatusCode);
+            activity?.SetTag("external_signals.vectors.count", vectors.Count);
+            activity?.SetStatus(ActivityStatusCode.Ok);
             return new BatchEnrichResponse(payload.SchemaVersion ?? "unknown", vectors);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Batch enrichment request failed.");
+            ExternalSignalsTelemetry.RecordClientRequest(
+                operation,
+                documents.Count,
+                "exception",
+                stopwatch.Elapsed.TotalMilliseconds);
+            activity?.SetTag("exception.type", ex.GetType().FullName);
+            activity?.SetTag("exception.message", ex.Message);
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             return null;
         }
     }
@@ -239,6 +349,16 @@ public sealed class ExternalSignalEnrichmentClient
             Url: signal.Url,
             Region: signal.Region,
             PublishedAt: signal.PublishedAt);
+
+    private static Activity? StartClientActivity(string operation, int documentCount)
+    {
+        var activity = ExternalSignalsTelemetry.ActivitySource.StartActivity(
+            $"external_signals.client.{operation}",
+            ActivityKind.Client);
+        activity?.SetTag("external_signals.operation", operation);
+        activity?.SetTag("external_signals.documents", documentCount);
+        return activity;
+    }
 
     private static bool TryBuildEnrichResponse(
         string? schemaVersion,

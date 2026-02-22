@@ -2,6 +2,7 @@ using AetherGuard.Core.Data;
 using AetherGuard.Core.Observability;
 using AetherGuard.Core.Security;
 using AetherGuard.Core.Services;
+using AetherGuard.Core.Services.ExternalSignals;
 using AetherGuard.Core.Services.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
@@ -98,6 +99,7 @@ if (otelOptions.Enabled)
                 .AddHttpClientInstrumentation()
                 .AddEntityFrameworkCoreInstrumentation()
                 .AddSource("AetherGuard.Core.Messaging")
+                .AddSource(ExternalSignalsTelemetry.ActivitySourceName)
                 .AddOtlpExporter(options =>
                 {
                     options.Endpoint = new Uri(otelOptions.OtlpEndpoint);
@@ -113,6 +115,7 @@ if (otelOptions.Enabled)
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
                 .AddProcessInstrumentation()
+                .AddMeter(ExternalSignalsTelemetry.MeterName)
                 .AddOtlpExporter(options =>
                 {
                     options.Endpoint = new Uri(otelOptions.OtlpEndpoint);

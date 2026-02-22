@@ -82,6 +82,21 @@ Expected (after at least one ingest cycle):
 Send 100+ documents to `/signals/enrich/batch` and confirm request latency remains within your
 target budget for deployment (for example, under a few seconds in local Docker with heuristic mode).
 
+## Verify observability (traces + metrics naming)
+
+1. Open Jaeger: `http://localhost:16686`.
+2. Search traces for service `aether-guard-core` and look for spans:
+   - `external_signals.client.summarize`
+   - `external_signals.client.enrich_batch` (or fallback `external_signals.client.enrich`)
+   - `external_signals.pipeline.enrich`
+3. Search traces for service `aether-guard-ai` and look for spans:
+   - `ai.signals.enrich`
+   - `ai.signals.enrich.batch`
+   - `ai.signals.summarize`
+4. Confirm metric names are documented and exported by configured OTLP pipeline:
+   - Core: `aetherguard.external_signals.*`
+   - AI: `aetherguard.ai.signals.*`
+
 ## Stop stack
 
 ```bash

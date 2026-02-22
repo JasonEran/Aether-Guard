@@ -1,18 +1,23 @@
 import logging
 import os
 import re
-from contextlib import asynccontextmanager
+import time
+from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Iterable
+from typing import Iterable, Iterator
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field, ConfigDict
-from opentelemetry import trace
+from opentelemetry import trace, metrics
+from opentelemetry.trace import Status, StatusCode
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
@@ -32,6 +37,14 @@ SUMMARY_ENDPOINT = os.getenv("AI_SUMMARIZER_ENDPOINT", "")
 SUMMARY_MAX_CHARS = int(os.getenv("AI_SUMMARIZER_MAX_CHARS", "600"))
 SUMMARY_CACHE_SIZE = int(os.getenv("AI_SUMMARIZER_CACHE_SIZE", "1024"))
 SUMMARY_TIMEOUT_SECONDS = float(os.getenv("AI_SUMMARIZER_TIMEOUT", "8"))
+SIGNALS_TELEMETRY_METER = "aether_guard.ai.signals"
+SIGNALS_TELEMETRY_TRACER = "aether_guard.ai.signals"
+
+signals_tracer = trace.get_tracer(SIGNALS_TELEMETRY_TRACER)
+signals_request_counter = None
+signals_error_counter = None
+signals_latency_histogram = None
+signals_document_histogram = None
 
 
 @asynccontextmanager
@@ -45,6 +58,85 @@ async def lifespan(app_instance: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+def initialize_signals_metrics() -> None:
+    global signals_request_counter
+    global signals_error_counter
+    global signals_latency_histogram
+    global signals_document_histogram
+
+    meter = metrics.get_meter(SIGNALS_TELEMETRY_METER)
+    signals_request_counter = meter.create_counter(
+        "aetherguard.ai.signals.requests",
+        description="Count of AI signal API requests.",
+    )
+    signals_error_counter = meter.create_counter(
+        "aetherguard.ai.signals.errors",
+        description="Count of AI signal API request failures.",
+    )
+    signals_latency_histogram = meter.create_histogram(
+        "aetherguard.ai.signals.duration.ms",
+        unit="ms",
+        description="Latency of AI signal API requests.",
+    )
+    signals_document_histogram = meter.create_histogram(
+        "aetherguard.ai.signals.documents",
+        unit="documents",
+        description="Document count per AI signal API request.",
+    )
+
+
+def record_signal_request(
+    endpoint: str,
+    provider: str,
+    documents: int,
+    duration_ms: float,
+    outcome: str,
+    error_type: str | None = None,
+) -> None:
+    base_attributes = {
+        "endpoint": endpoint,
+        "provider": provider,
+    }
+    outcome_attributes = {
+        **base_attributes,
+        "outcome": outcome,
+    }
+
+    if signals_request_counter is not None:
+        signals_request_counter.add(1, outcome_attributes)
+    if signals_latency_histogram is not None:
+        signals_latency_histogram.record(duration_ms, base_attributes)
+    if signals_document_histogram is not None:
+        signals_document_histogram.record(max(0, documents), base_attributes)
+
+    if error_type and signals_error_counter is not None:
+        signals_error_counter.add(1, {**base_attributes, "error.type": error_type})
+
+
+@contextmanager
+def observe_signal_endpoint(endpoint: str, provider: str, documents: int) -> Iterator[object]:
+    start = time.perf_counter()
+    outcome = "success"
+    error_type: str | None = None
+
+    with signals_tracer.start_as_current_span(f"ai{endpoint.replace('/', '.')}") as span:
+        span.set_attribute("ai.signals.endpoint", endpoint)
+        span.set_attribute("ai.signals.provider", provider)
+        span.set_attribute("ai.signals.documents", documents)
+        try:
+            yield span
+            span.set_status(Status(StatusCode.OK))
+        except Exception as exc:
+            outcome = "error"
+            error_type = type(exc).__name__
+            span.record_exception(exc)
+            span.set_status(Status(StatusCode.ERROR))
+            raise
+        finally:
+            duration_ms = (time.perf_counter() - start) * 1000
+            record_signal_request(endpoint, provider, documents, duration_ms, outcome, error_type)
 
 
 class RiskPayload(BaseModel):
@@ -177,34 +269,39 @@ def analyze(payload: RiskPayload) -> dict:
 @app.post("/signals/enrich", response_model=EnrichResponse)
 def enrich_signals(payload: EnrichRequest) -> EnrichResponse:
     enricher: SemanticEnricher = app.state.enricher
-    result = sanitize_enrich_result(enricher.enrich(payload.documents))
-    return EnrichResponse(
-        schemaVersion=ENRICHMENT_SCHEMA_VERSION,
-        S_v=result.s_v,
-        P_v=result.p_v,
-        B_s=result.b_s,
-    )
+    with observe_signal_endpoint("/signals/enrich", ENRICHMENT_PROVIDER, len(payload.documents)) as span:
+        result = sanitize_enrich_result(enricher.enrich(payload.documents))
+        span.set_attribute("ai.signals.schema_version", ENRICHMENT_SCHEMA_VERSION)
+        return EnrichResponse(
+            schemaVersion=ENRICHMENT_SCHEMA_VERSION,
+            S_v=result.s_v,
+            P_v=result.p_v,
+            B_s=result.b_s,
+        )
 
 
 @app.post("/signals/enrich/batch", response_model=EnrichBatchResponse)
 def enrich_signals_batch(payload: EnrichRequest) -> EnrichBatchResponse:
     enricher: SemanticEnricher = app.state.enricher
-    vectors = [
-        EnrichBatchItem(
-            index=index,
-            S_v=result.s_v,
-            P_v=result.p_v,
-            B_s=result.b_s,
-        )
-        for index, result in enumerate(
-            [sanitize_enrich_result(result) for result in enricher.enrich_batch(payload.documents)]
-        )
-    ]
+    with observe_signal_endpoint("/signals/enrich/batch", ENRICHMENT_PROVIDER, len(payload.documents)) as span:
+        vectors = [
+            EnrichBatchItem(
+                index=index,
+                S_v=result.s_v,
+                P_v=result.p_v,
+                B_s=result.b_s,
+            )
+            for index, result in enumerate(
+                [sanitize_enrich_result(result) for result in enricher.enrich_batch(payload.documents)]
+            )
+        ]
 
-    return EnrichBatchResponse(
-        schemaVersion=ENRICHMENT_SCHEMA_VERSION,
-        vectors=vectors,
-    )
+        span.set_attribute("ai.signals.schema_version", ENRICHMENT_SCHEMA_VERSION)
+        span.set_attribute("ai.signals.vectors", len(vectors))
+        return EnrichBatchResponse(
+            schemaVersion=ENRICHMENT_SCHEMA_VERSION,
+            vectors=vectors,
+        )
 
 
 @app.get("/signals/enrich/schema")
@@ -492,38 +589,46 @@ def normalize_text(text: str) -> str:
 @app.post("/signals/summarize", response_model=SummarizeResponse)
 def summarize_signals(payload: SummarizeRequest) -> SummarizeResponse:
     summarizer: SignalSummarizer = app.state.summarizer
-    max_chars = payload.max_chars if payload.max_chars and payload.max_chars > 0 else SUMMARY_MAX_CHARS
-    summaries: list[SummaryItem] = []
+    with observe_signal_endpoint("/signals/summarize", SUMMARY_PROVIDER, len(payload.documents)) as span:
+        max_chars = payload.max_chars if payload.max_chars and payload.max_chars > 0 else SUMMARY_MAX_CHARS
+        summaries: list[SummaryItem] = []
 
-    for index, doc in enumerate(payload.documents):
-        source = doc.source
-        title = doc.title
-        text = f"{doc.title}. {doc.summary}" if doc.summary else doc.title
-        result = summarizer.summarize(text, max_chars)
-        summaries.append(
-            SummaryItem(
-                index=index,
-                source=source,
-                title=title,
-                summary=result.summary,
-                truncated=result.truncated,
+        for index, doc in enumerate(payload.documents):
+            source = doc.source
+            title = doc.title
+            text = f"{doc.title}. {doc.summary}" if doc.summary else doc.title
+            result = summarizer.summarize(text, max_chars)
+            summaries.append(
+                SummaryItem(
+                    index=index,
+                    source=source,
+                    title=title,
+                    summary=result.summary,
+                    truncated=result.truncated,
+                )
             )
-        )
 
-    return SummarizeResponse(schemaVersion=SUMMARY_SCHEMA_VERSION, summaries=summaries)
+        span.set_attribute("ai.signals.schema_version", SUMMARY_SCHEMA_VERSION)
+        span.set_attribute("ai.signals.max_chars", max_chars)
+        return SummarizeResponse(schemaVersion=SUMMARY_SCHEMA_VERSION, summaries=summaries)
 
 def configure_tracing() -> None:
     endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-    if not endpoint:
-        return
-
     service_name = os.getenv("OTEL_SERVICE_NAME", "aether-guard-ai")
     resource = Resource.create({"service.name": service_name})
-    provider = TracerProvider(resource=resource)
-    exporter = OTLPSpanExporter(endpoint=endpoint)
-    provider.add_span_processor(BatchSpanProcessor(exporter))
-    trace.set_tracer_provider(provider)
 
+    if endpoint:
+        trace_provider = TracerProvider(resource=resource)
+        span_exporter = OTLPSpanExporter(endpoint=endpoint)
+        trace_provider.add_span_processor(BatchSpanProcessor(span_exporter))
+        trace.set_tracer_provider(trace_provider)
+
+        metric_exporter = OTLPMetricExporter(endpoint=endpoint)
+        metric_reader = PeriodicExportingMetricReader(metric_exporter)
+        metric_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
+        metrics.set_meter_provider(metric_provider)
+
+    initialize_signals_metrics()
     RequestsInstrumentor().instrument()
     FastAPIInstrumentor.instrument_app(app)
 
