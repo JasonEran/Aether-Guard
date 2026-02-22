@@ -26,6 +26,7 @@ docker compose up --build -d
 ```
 
 For SPIRE-based mTLS details, see `docs/SPIRE-mTLS.md`.
+For SPIRE join-token recovery, see `docs/Runbook-SPIRE-JoinToken.md`.
 For observability setup, see `docs/Observability.md`.
 
 Open the dashboard at `http://localhost:3000` and log in with:
@@ -34,6 +35,122 @@ Open the dashboard at `http://localhost:3000` and log in with:
 - Password: `admin123`
 
 Open Jaeger at `http://localhost:16686` to view traces.
+
+## Optional: Enable external signals (v2.3 Milestone 0)
+
+External signals ingestion is disabled by default. To enable:
+
+```bash
+# PowerShell
+$env:ExternalSignals__Enabled="true"
+# Optional retention tuning
+$env:ExternalSignals__RetentionDays="30"
+$env:ExternalSignals__CleanupBatchSize="500"
+# Bash
+export ExternalSignals__Enabled=true
+export ExternalSignals__RetentionDays=30
+export ExternalSignals__CleanupBatchSize=500
+```
+
+Then restart the core service. Signals are accessible via:
+
+```
+GET /api/v1/signals?limit=50
+```
+
+Feed health status is available via:
+
+```
+GET /api/v1/signals/feeds
+```
+
+Smoke test checklist: `docs/QA-SmokeTest-v2.3.md`.
+
+## Optional: Enable semantic enrichment (v2.3 Milestone 1)
+
+The AI engine defaults to a FinBERT-based enricher when dependencies are available.
+You can force the provider via environment variables:
+
+```bash
+# PowerShell
+$env:AI_ENRICH_PROVIDER="finbert"   # or "heuristic"
+$env:AI_FINBERT_MODEL="ProsusAI/finbert"
+
+# Bash
+export AI_ENRICH_PROVIDER=finbert
+export AI_FINBERT_MODEL=ProsusAI/finbert
+```
+
+Core will call the AI engine for enrichment when external signals are enabled.
+If the AI engine is not running at the default Docker host (`http://ai-service:8000`), override:
+
+```bash
+# PowerShell
+$env:ExternalSignals__Enrichment__BaseUrl="http://localhost:8000"
+
+# Bash
+export ExternalSignals__Enrichment__BaseUrl=http://localhost:8000
+```
+
+Note: the first FinBERT run downloads model weights and can take a few minutes.
+Set `AI_ENRICH_PROVIDER=heuristic` if you need a fast, offline fallback.
+
+Schema details:
+
+```
+GET /signals/enrich/schema
+```
+
+Batch enrichment endpoint (recommended for throughput):
+
+```
+POST /signals/enrich/batch
+```
+
+Example payload:
+
+```bash
+curl -X POST http://localhost:8000/signals/enrich/batch \
+  -H "Content-Type: application/json" \
+  -d '{"documents":[{"source":"aws","title":"Service disruption in us-east-1","summary":"Investigating elevated errors."},{"source":"gcp","title":"RESOLVED: incident in us-central1","summary":"Service recovered."}]}'
+```
+
+Core prefers `/signals/enrich/batch` and falls back to `/signals/enrich` automatically.
+Milestone 1 smoke test checklist: `docs/QA-SmokeTest-v2.3-M1.md`.
+
+## Optional: Enable summarization (v2.3 Milestone 1)
+
+The AI engine can summarize long advisories with a built-in heuristic summarizer or a remote HTTP summarizer.
+
+```bash
+# PowerShell
+$env:AI_SUMMARIZER_PROVIDER="heuristic"   # or "http"
+$env:AI_SUMMARIZER_ENDPOINT="https://summarizer.example/api" # required for http
+$env:AI_SUMMARIZER_MAX_CHARS="600"
+$env:AI_SUMMARIZER_CACHE_SIZE="1024"
+$env:AI_SUMMARIZER_TIMEOUT="8"
+
+# Bash
+export AI_SUMMARIZER_PROVIDER=heuristic
+export AI_SUMMARIZER_ENDPOINT=https://summarizer.example/api
+export AI_SUMMARIZER_MAX_CHARS=600
+export AI_SUMMARIZER_CACHE_SIZE=1024
+export AI_SUMMARIZER_TIMEOUT=8
+```
+
+Summarize signals:
+
+```
+POST /signals/summarize
+```
+
+Example payload:
+
+```bash
+curl -X POST http://localhost:8000/signals/summarize \
+  -H "Content-Type: application/json" \
+  -d '{"documents":[{"source":"aws","title":"AWS incident update","summary":"Service degradation observed in us-east-1..."}],"maxChars":280}'
+```
 
 If you want to simulate migrations, start at least two agents:
 

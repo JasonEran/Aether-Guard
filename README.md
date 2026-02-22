@@ -18,7 +18,7 @@ v2.2 reference architecture with a concrete implementation guide.
 
 ## Project Status
 
-- Stage: v2.2 baseline delivered (Phase 0-4). v2.3 transition roadmap in docs/ARCHITECTURE-v2.3.md.
+- Stage: v2.2 baseline delivered (Phase 0-4). v2.3 Milestone 1 delivered; Milestone 2+ tracked in docs/ROADMAP-v2.3.md.
 - License: MIT
 - Authors: Qi Junyi, Xiao Erdong (2026)
 - Sponsor: https://github.com/sponsors/JasonEran
@@ -194,6 +194,9 @@ Open the dashboard at http://localhost:3000.
 - Observability (OpenTelemetry): docs/Observability.md
 - v2.3 architecture roadmap: docs/ARCHITECTURE-v2.3.md
 - v2.3 delivery roadmap: docs/ROADMAP-v2.3.md
+- v2.3 Milestone 1 smoke test: docs/QA-SmokeTest-v2.3-M1.md
+- v2.3 M2 data provenance: docs/Data-Provenance-v2.3-M2.md
+- v2.3 M2 data acquisition scripts: scripts/data_acquisition/README.md
 
 If you want to simulate migrations, start at least two agents:
 
@@ -358,7 +361,8 @@ sidecars to issue and rotate X.509 SVIDs:
 
 - Core serves mTLS on `https://core-service:8443` (host-mapped to 5001).
 - Agent uses SPIFFE-issued certs from `/run/spiffe/certs` and calls the mTLS endpoint.
-- HTTP on `http://core-service:8080` remains for dashboard/AI traffic.
+- When `Security__Mtls__AllowHttp=true`, Core also listens on `http://core-service:8080` for
+  dashboard/AI traffic (host-mapped to 5000).
 
 Disable mTLS locally by setting:
 

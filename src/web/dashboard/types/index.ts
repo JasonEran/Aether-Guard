@@ -22,3 +22,28 @@ export interface AuditLog {
   error?: string;
   timestamp: string;
 }
+
+export interface ExternalSignal {
+  id: number;
+  source: string;
+  externalId: string;
+  title: string;
+  summary?: string | null;
+  region?: string | null;
+  severity?: string | null;
+  category?: string | null;
+  url?: string | null;
+  tags?: string | null;
+  publishedAt: string;
+  ingestedAt: string;
+}
+
+export interface ExternalSignalFeedState {
+  name: string;
+  url: string;
+  lastFetchAt: string;
+  lastSuccessAt?: string | null;
+  failureCount: number;
+  lastError?: string | null;
+  lastStatusCode?: number | null;
+}

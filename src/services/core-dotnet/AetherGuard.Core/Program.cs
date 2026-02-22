@@ -2,6 +2,7 @@ using AetherGuard.Core.Data;
 using AetherGuard.Core.Observability;
 using AetherGuard.Core.Security;
 using AetherGuard.Core.Services;
+using AetherGuard.Core.Services.ExternalSignals;
 using AetherGuard.Core.Services.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
@@ -28,6 +29,11 @@ if (mtlsOptions.Enabled)
 
     builder.WebHost.ConfigureKestrel(options =>
     {
+        if (mtlsOptions.AllowHttp)
+        {
+            options.ListenAnyIP(mtlsOptions.HttpPort);
+        }
+
         options.ListenAnyIP(mtlsOptions.Port, listenOptions =>
         {
             listenOptions.UseHttps(httpsOptions =>
@@ -51,6 +57,12 @@ builder.Services.AddGrpc().AddJsonTranscoding();
 
 builder.Services.AddSingleton<TelemetryStore>();
 builder.Services.AddHttpClient<AnalysisService>();
+builder.Services.AddHttpClient("external-signals", client =>
+{
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Aether-Guard/ExternalSignals");
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
+builder.Services.AddHttpClient<AetherGuard.Core.Services.ExternalSignals.ExternalSignalEnrichmentClient>();
 builder.Services.AddScoped<AgentWorkflowService>();
 builder.Services.AddScoped<TelemetryIngestionService>();
 builder.Services.AddScoped<ControlPlaneService>();
@@ -64,6 +76,9 @@ builder.Services.AddHostedService<MigrationCycleService>();
 builder.Services.AddHostedService<SnapshotRetentionService>();
 builder.Services.AddSingleton<AetherGuard.Core.Services.SchemaRegistry.SchemaRegistryService>();
 builder.Services.AddHostedService<AetherGuard.Core.Services.SchemaRegistry.SchemaRegistrySeeder>();
+builder.Services.Configure<AetherGuard.Core.Services.ExternalSignals.ExternalSignalsOptions>(
+    builder.Configuration.GetSection("ExternalSignals"));
+builder.Services.AddHostedService<AetherGuard.Core.Services.ExternalSignals.ExternalSignalIngestionService>();
 
 var otelOptions = builder.Configuration.GetSection("OpenTelemetry").Get<OpenTelemetryOptions>()
     ?? new OpenTelemetryOptions();
@@ -84,6 +99,7 @@ if (otelOptions.Enabled)
                 .AddHttpClientInstrumentation()
                 .AddEntityFrameworkCoreInstrumentation()
                 .AddSource("AetherGuard.Core.Messaging")
+                .AddSource(ExternalSignalsTelemetry.ActivitySourceName)
                 .AddOtlpExporter(options =>
                 {
                     options.Endpoint = new Uri(otelOptions.OtlpEndpoint);
@@ -99,6 +115,7 @@ if (otelOptions.Enabled)
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
                 .AddProcessInstrumentation()
+                .AddMeter(ExternalSignalsTelemetry.MeterName)
                 .AddOtlpExporter(options =>
                 {
                     options.Endpoint = new Uri(otelOptions.OtlpEndpoint);

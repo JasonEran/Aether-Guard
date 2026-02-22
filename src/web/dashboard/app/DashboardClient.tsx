@@ -5,11 +5,20 @@ import { signOut } from 'next-auth/react';
 
 import AuditLogStream from '../components/AuditLogStream';
 import ExplainabilityPanel from '../components/ExplainabilityPanel';
+import ExternalSignalsPanel from '../components/ExternalSignalsPanel';
 import FirstRunGuide from '../components/FirstRunGuide';
 import ControlPanel from '../components/ControlPanel';
 import HistoryChart from '../components/HistoryChart';
-import { fetchAuditLogs, fetchFleetStatus, fetchRiskHistory, sendChaosSignal, RiskPoint } from '../lib/api';
-import type { Agent, AuditLog } from '../types';
+import {
+  fetchAuditLogs,
+  fetchExternalSignalFeeds,
+  fetchExternalSignals,
+  fetchFleetStatus,
+  fetchRiskHistory,
+  sendChaosSignal,
+  RiskPoint,
+} from '../lib/api';
+import type { Agent, AuditLog, ExternalSignal, ExternalSignalFeedState } from '../types';
 
 interface DashboardClientProps {
   userName: string;
@@ -103,6 +112,81 @@ const buildMockPayload = (now: number, chaosActive: boolean) => {
     },
   ];
 
+  const mockSignals: ExternalSignal[] = [
+    {
+      id: 1,
+      source: 'aws-status',
+      externalId: 'aws-2026-01',
+      title: 'Elevated latency in us-east-1 availability zones',
+      summary: 'Investigating increased API latency affecting spot capacity decisions.',
+      region: 'us-east-1',
+      severity: chaosActive ? 'critical' : 'warning',
+      category: 'latency',
+      url: 'https://status.aws.amazon.com',
+      tags: 'latency,spot',
+      publishedAt: new Date(now - 18 * 60_000).toISOString(),
+      ingestedAt: new Date(now - 15 * 60_000).toISOString(),
+    },
+    {
+      id: 2,
+      source: 'gcp-status',
+      externalId: 'gcp-2026-02',
+      title: 'Compute Engine spot capacity advisory',
+      summary: 'Spot instance preemption notices increased in europe-west4.',
+      region: 'europe-west4',
+      severity: 'warning',
+      category: 'capacity',
+      url: 'https://status.cloud.google.com',
+      tags: 'capacity,preemption',
+      publishedAt: new Date(now - 55 * 60_000).toISOString(),
+      ingestedAt: new Date(now - 50 * 60_000).toISOString(),
+    },
+    {
+      id: 3,
+      source: 'azure-status',
+      externalId: 'azure-2026-03',
+      title: 'Azure spot price volatility notice',
+      summary: 'Monitoring pricing volatility in West US 2.',
+      region: 'westus2',
+      severity: 'info',
+      category: 'pricing',
+      url: 'https://status.azure.com',
+      tags: 'pricing',
+      publishedAt: new Date(now - 2 * 60_000 * 60).toISOString(),
+      ingestedAt: new Date(now - 110 * 60_000).toISOString(),
+    },
+  ];
+
+  const mockFeeds: ExternalSignalFeedState[] = [
+    {
+      name: 'aws-status',
+      url: 'https://status.aws.amazon.com/rss/all.rss',
+      lastFetchAt: new Date(now - 2 * 60_000).toISOString(),
+      lastSuccessAt: new Date(now - 2 * 60_000).toISOString(),
+      failureCount: 0,
+      lastError: null,
+      lastStatusCode: 200,
+    },
+    {
+      name: 'gcp-status',
+      url: 'https://status.cloud.google.com/en/feed.atom',
+      lastFetchAt: new Date(now - 5 * 60_000).toISOString(),
+      lastSuccessAt: new Date(now - 5 * 60_000).toISOString(),
+      failureCount: 0,
+      lastError: null,
+      lastStatusCode: 200,
+    },
+    {
+      name: 'azure-status',
+      url: 'https://status.azure.com/en-us/status/feed/',
+      lastFetchAt: new Date(now - 4 * 60_000).toISOString(),
+      lastSuccessAt: new Date(now - 4 * 60_000).toISOString(),
+      failureCount: chaosActive ? 1 : 0,
+      lastError: chaosActive ? 'Timeout fetching feed' : null,
+      lastStatusCode: chaosActive ? 504 : 200,
+    },
+  ];
+
   if (chaosActive) {
     mockAudits.unshift({
       id: `audit-${now}-chaos`,
@@ -114,7 +198,7 @@ const buildMockPayload = (now: number, chaosActive: boolean) => {
     });
   }
 
-  return { mockHistory, mockAgents, mockAudits };
+  return { mockHistory, mockAgents, mockAudits, mockSignals, mockFeeds };
 };
 
 const formatLocalTime = (value?: string) => {
@@ -134,7 +218,10 @@ export default function DashboardClient({ userName, userRole }: DashboardClientP
   const [agents, setAgents] = useState<FleetEntry[]>([]);
   const [history, setHistory] = useState<RiskPoint[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [signals, setSignals] = useState<ExternalSignal[]>([]);
+  const [feeds, setFeeds] = useState<ExternalSignalFeedState[]>([]);
   const [usingMock, setUsingMock] = useState(false);
+  const [signalsUsingMock, setSignalsUsingMock] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [showFirstRunGuide, setShowFirstRunGuide] = useState(true);
   const mockChaosAtRef = useRef<number | null>(null);
@@ -167,15 +254,19 @@ export default function DashboardClient({ userName, userRole }: DashboardClientP
     let isMounted = true;
 
     const load = async () => {
-      const [fleetResult, historyResult, auditResult] = await Promise.allSettled([
+      const [fleetResult, historyResult, auditResult, signalsResult, feedsResult] = await Promise.allSettled([
         fetchFleetStatus(),
         fetchRiskHistory(),
         fetchAuditLogs(),
+        fetchExternalSignals(),
+        fetchExternalSignalFeeds(),
       ]);
 
       const fleetData = fleetResult.status === 'fulfilled' ? fleetResult.value : [];
       const historyData = historyResult.status === 'fulfilled' ? historyResult.value : [];
       const auditData = auditResult.status === 'fulfilled' ? auditResult.value : [];
+      const signalsData = signalsResult.status === 'fulfilled' ? signalsResult.value : [];
+      const feedsData = feedsResult.status === 'fulfilled' ? feedsResult.value : [];
 
       if (!isMounted) {
         return;
@@ -188,7 +279,12 @@ export default function DashboardClient({ userName, userRole }: DashboardClientP
       const useMockHistory = historyData.length === 0;
       const useMockAudits = auditData.length === 0;
       const useMock = useMockFleet || useMockHistory || useMockAudits;
+      const useMockSignals = signalsData.length === 0;
+      const useMockFeeds = feedsData.length === 0;
       setUsingMock(useMock);
+      setSignalsUsingMock(useMockSignals || useMockFeeds);
+      setSignals(useMockSignals ? mockPayload.mockSignals : signalsData);
+      setFeeds(useMockFeeds ? mockPayload.mockFeeds : feedsData);
       if (useMock) {
         setAgents(mockPayload.mockAgents);
         setHistory(mockPayload.mockHistory);
@@ -371,6 +467,7 @@ export default function DashboardClient({ userName, userRole }: DashboardClientP
 
           <div className="lg:col-span-1 flex flex-col gap-6">
             <ExplainabilityPanel agent={primaryAgent} usingMock={usingMock} />
+            <ExternalSignalsPanel signals={signals} feeds={feeds} usingMock={signalsUsingMock} />
             <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-[0_0_40px_rgba(15,23,42,0.6)]">
               <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Risk Trend</div>
               <div className="mt-4">

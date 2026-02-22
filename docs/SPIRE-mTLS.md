@@ -45,6 +45,11 @@ docker compose exec core-service ls -la /run/spiffe/certs
 docker compose exec agent-service ls -la /run/spiffe/certs
 ```
 
+## Join-token rotation
+
+If the SPIRE agent reports `join token already used/expired`, follow the
+runbook at `docs/Runbook-SPIRE-JoinToken.md`.
+
 ## Notes
 
 - The SPIRE agent mounts the Docker Engine socket to attest workloads by label.

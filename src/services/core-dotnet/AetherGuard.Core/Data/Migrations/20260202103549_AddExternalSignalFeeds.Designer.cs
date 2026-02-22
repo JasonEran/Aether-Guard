@@ -3,6 +3,7 @@ using System;
 using AetherGuard.Core.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AetherGuard.Core.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260202103549_AddExternalSignalFeeds")]
+    partial class AddExternalSignalFeeds
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -204,50 +207,6 @@ namespace AetherGuard.Core.Data.Migrations
                     b.Property<string>("Summary")
                         .HasColumnType("text")
                         .HasColumnName("summary");
-
-                    b.Property<string>("SummaryDigest")
-                        .HasColumnType("text")
-                        .HasColumnName("summary_digest");
-
-                    b.Property<bool?>("SummaryDigestTruncated")
-                        .HasColumnType("boolean")
-                        .HasColumnName("summary_digest_truncated");
-
-                    b.Property<string>("SummarySchemaVersion")
-                        .HasColumnType("text")
-                        .HasColumnName("summary_schema_version");
-
-                    b.Property<string>("EnrichmentSchemaVersion")
-                        .HasColumnType("text")
-                        .HasColumnName("enrichment_schema_version");
-
-                    b.Property<double?>("SentimentNegative")
-                        .HasColumnType("double precision")
-                        .HasColumnName("sentiment_negative");
-
-                    b.Property<double?>("SentimentNeutral")
-                        .HasColumnType("double precision")
-                        .HasColumnName("sentiment_neutral");
-
-                    b.Property<double?>("SentimentPositive")
-                        .HasColumnType("double precision")
-                        .HasColumnName("sentiment_positive");
-
-                    b.Property<double?>("VolatilityProbability")
-                        .HasColumnType("double precision")
-                        .HasColumnName("volatility_probability");
-
-                    b.Property<double?>("SupplyBias")
-                        .HasColumnType("double precision")
-                        .HasColumnName("supply_bias");
-
-                    b.Property<DateTimeOffset?>("SummarizedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("summarized_at");
-
-                    b.Property<DateTimeOffset?>("EnrichedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("enriched_at");
 
                     b.Property<string>("Tags")
                         .HasColumnType("text")
