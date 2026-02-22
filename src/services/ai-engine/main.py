@@ -612,18 +612,47 @@ def summarize_signals(payload: SummarizeRequest) -> SummarizeResponse:
         span.set_attribute("ai.signals.max_chars", max_chars)
         return SummarizeResponse(schemaVersion=SUMMARY_SCHEMA_VERSION, summaries=summaries)
 
+def resolve_otlp_endpoint(base_endpoint: str | None, signal_endpoint: str | None, signal: str) -> str | None:
+    if signal_endpoint:
+        return signal_endpoint
+
+    if not base_endpoint:
+        return None
+
+    normalized = base_endpoint.rstrip("/")
+    signal_suffix = f"/v1/{signal}"
+
+    if normalized.endswith(signal_suffix):
+        return normalized
+    if normalized.endswith("/v1"):
+        return f"{normalized}/{signal}"
+
+    return f"{normalized}{signal_suffix}"
+
+
 def configure_tracing() -> None:
-    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+    base_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+    trace_endpoint = resolve_otlp_endpoint(
+        base_endpoint,
+        os.getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"),
+        "traces",
+    )
+    metric_endpoint = resolve_otlp_endpoint(
+        base_endpoint,
+        os.getenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"),
+        "metrics",
+    )
     service_name = os.getenv("OTEL_SERVICE_NAME", "aether-guard-ai")
     resource = Resource.create({"service.name": service_name})
 
-    if endpoint:
+    if trace_endpoint:
         trace_provider = TracerProvider(resource=resource)
-        span_exporter = OTLPSpanExporter(endpoint=endpoint)
+        span_exporter = OTLPSpanExporter(endpoint=trace_endpoint)
         trace_provider.add_span_processor(BatchSpanProcessor(span_exporter))
         trace.set_tracer_provider(trace_provider)
 
-        metric_exporter = OTLPMetricExporter(endpoint=endpoint)
+    if metric_endpoint:
+        metric_exporter = OTLPMetricExporter(endpoint=metric_endpoint)
         metric_reader = PeriodicExportingMetricReader(metric_exporter)
         metric_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
         metrics.set_meter_provider(metric_provider)
