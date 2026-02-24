@@ -90,3 +90,20 @@ Fusion outputs:
 - `telemetry_only_baseline.pt`
 - `fusion_baseline.pt`
 - `fusion_evaluation_summary.json` (contains offline baseline metrics and deltas)
+
+## Backtest Harness (Issue #37)
+
+Compare v2.3 fusion model against v2.2 heuristic on held-out windows:
+
+```bash
+python scripts/model_training/backtest_fusion_vs_v22.py \
+  --fusion-checkpoint .tmp/fusion-baseline-smoke/fusion_baseline.pt \
+  --output-dir .tmp/backtest-fusion-vs-v22
+```
+
+If checkpoint is missing, the script can auto-train a fusion baseline and then run backtest.
+
+Backtest outputs:
+
+- `backtest_summary.json`
+- `backtest_report.md`
