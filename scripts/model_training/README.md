@@ -1,10 +1,11 @@
 # TSMixer Baseline Training (v2.3 M2)
 
-This folder contains the baseline training workflow for issue #35:
+This folder contains the baseline training workflows for Milestone 2:
 
 - Reproducible TSMixer training (seeded, deterministic flags enabled).
 - ONNX export for agent-side inference.
 - ONNX validation (checker + onnxruntime parity).
+- Fusion baseline training with semantic vectors (`S_v`, `P_v`, `B_s`) and offline comparison.
 
 ## Prerequisites
 
@@ -50,3 +51,42 @@ Each run writes:
 - `--seed` controls Python, NumPy, and PyTorch RNGs.
 - Deterministic PyTorch mode is enabled (`torch.use_deterministic_algorithms`).
 - Data split uses deterministic shuffling with the same seed.
+
+## Fusion Baseline (Issue #36)
+
+Train telemetry-only and fusion models on the same dataset, then export a comparison summary:
+
+```bash
+python scripts/model_training/train_fusion_baseline.py \
+  --epochs 12 \
+  --output-dir .tmp/fusion-baseline-smoke
+```
+
+If the provided CSV does not contain the required semantic contract columns, the script falls back to deterministic synthetic data and records the reason.
+
+### Fusion Input Contract (CSV)
+
+Required semantic columns:
+
+- `s_v_negative`
+- `s_v_neutral`
+- `s_v_positive`
+- `p_v`
+- `b_s`
+
+Telemetry columns are configurable via `--telemetry-columns` and default to:
+
+- `spot_price_usd`
+- `cpu_utilization`
+- `memory_utilization`
+- `network_io`
+
+Optional label:
+
+- `label_preempt` (binary). If missing, labels are derived from future return + `p_v`.
+
+Fusion outputs:
+
+- `telemetry_only_baseline.pt`
+- `fusion_baseline.pt`
+- `fusion_evaluation_summary.json` (contains offline baseline metrics and deltas)
