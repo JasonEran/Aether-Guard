@@ -162,6 +162,7 @@ bool NetworkClient::Register(
         outConfig->enableEbpf = config.value("enableEbpf", false);
         outConfig->enableNetTopology = config.value("enableNetTopology", false);
         outConfig->enableChaos = config.value("enableChaos", false);
+        outConfig->enableLocalInference = config.value("enableLocalInference", false);
         outConfig->nodeMode = config.value("nodeMode", "");
     }
     return !outToken.empty() && !outAgentId.empty();

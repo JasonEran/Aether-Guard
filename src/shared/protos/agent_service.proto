@@ -75,6 +75,7 @@ message AgentConfig {
   bool enable_net_topology = 3;
   bool enable_chaos = 4;
   string node_mode = 5;
+  bool enable_local_inference = 6;
 }
 
 message SemanticHeartbeatFeatures {

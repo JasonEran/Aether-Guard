@@ -207,6 +207,7 @@ int main() {
             if (!agentConfig.nodeMode.empty()) {
                 std::cout << "[Agent] Config: snapshot=" << (agentConfig.enableSnapshot ? "on" : "off")
                           << ", ebpf=" << (agentConfig.enableEbpf ? "on" : "off")
+                          << ", local_inference=" << (agentConfig.enableLocalInference ? "on" : "off")
                           << ", node_mode=" << agentConfig.nodeMode << std::endl;
             }
             break;
@@ -222,11 +223,16 @@ int main() {
     }
 
     InferenceRuntimeConfig inferenceConfig;
-    inferenceConfig.enabled = GetEnvBool("AG_M3_ONLINE_INFERENCE_ENABLED", false);
+    const bool localInferenceRequested = GetEnvBool("AG_M3_ONLINE_INFERENCE_ENABLED", false);
+    inferenceConfig.enabled = localInferenceRequested && agentConfig.enableLocalInference;
     inferenceConfig.forceV22Fallback = GetEnvBool("AG_M3_FORCE_V22_FALLBACK", false);
     inferenceConfig.failOpen = GetEnvBool("AG_ONNX_FAIL_OPEN", true);
     inferenceConfig.modelPath = GetEnvOrDefault("AG_ONNX_MODEL_PATH", "");
     inferenceConfig.decisionThreshold = GetEnvDouble("AG_ONNX_DECISION_THRESHOLD", 0.65);
+
+    if (localInferenceRequested && !agentConfig.enableLocalInference) {
+        std::cout << "[Agent] Local inference requested but disabled by control-plane gate." << std::endl;
+    }
 
     InferenceEngine inferenceEngine(inferenceConfig);
     const bool inferenceInitialized = inferenceEngine.Initialize();

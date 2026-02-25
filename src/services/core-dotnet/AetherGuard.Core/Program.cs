@@ -78,6 +78,8 @@ builder.Services.AddSingleton<AetherGuard.Core.Services.SchemaRegistry.SchemaReg
 builder.Services.AddHostedService<AetherGuard.Core.Services.SchemaRegistry.SchemaRegistrySeeder>();
 builder.Services.Configure<AetherGuard.Core.Services.ExternalSignals.ExternalSignalsOptions>(
     builder.Configuration.GetSection("ExternalSignals"));
+builder.Services.Configure<AgentInferenceOptions>(
+    builder.Configuration.GetSection("AgentInference"));
 builder.Services.AddHostedService<AetherGuard.Core.Services.ExternalSignals.ExternalSignalIngestionService>();
 
 var otelOptions = builder.Configuration.GetSection("OpenTelemetry").Get<OpenTelemetryOptions>()

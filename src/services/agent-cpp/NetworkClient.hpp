@@ -42,6 +42,7 @@ struct AgentConfig {
     bool enableEbpf = false;
     bool enableNetTopology = false;
     bool enableChaos = false;
+    bool enableLocalInference = false;
     std::string nodeMode;
 };
 

@@ -52,7 +52,8 @@ public class AgentController : ControllerBase
                 enableEbpf = config.EnableEbpf,
                 enableNetTopology = config.EnableNetTopology,
                 enableChaos = config.EnableChaos,
-                nodeMode = config.NodeMode
+                nodeMode = config.NodeMode,
+                enableLocalInference = config.EnableLocalInference
             };
 
         return Ok(new { token = result.Payload?.Token, agentId = result.Payload?.AgentId, config = configPayload });
