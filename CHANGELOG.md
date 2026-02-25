@@ -29,6 +29,7 @@ Semantic Versioning.
 - Agent now injects W3C trace headers for HTTP requests.
 - Dashboard dependencies updated to Next.js 16.1.6.
 - Core external-signal ingestion now prefers batch enrichment and falls back to per-item enrichment.
+- CI supply-chain workflows now use path-filtered push/PR triggers and refreshed action versions.
 
 ### Deprecated
 - 

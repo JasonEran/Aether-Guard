@@ -64,6 +64,4 @@ v2.3 upgrades Aether-Guard from static/reactive risk handling to a predictive mu
 
 ## Known Follow-ups
 
-- `#48` v2.3 release criteria checklist (open)
-- `#14` CI / supply-chain stabilization epic (open)
 - `#8` course/project management epic (open)

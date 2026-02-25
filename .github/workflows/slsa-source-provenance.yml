@@ -1,6 +1,27 @@
 name: SLSA Provenance (Source)
 
 on:
+  push:
+    branches:
+      - master
+      - release/**
+    paths:
+      - .github/workflows/slsa-source-provenance.yml
+      - .github/workflows/supply-chain.yml
+      - docker-compose.yml
+      - infrastructure/**
+      - src/**
+      - third_party/**
+  pull_request:
+    branches:
+      - master
+    paths:
+      - .github/workflows/slsa-source-provenance.yml
+      - .github/workflows/supply-chain.yml
+      - docker-compose.yml
+      - infrastructure/**
+      - src/**
+      - third_party/**
   workflow_dispatch:
 
 permissions:

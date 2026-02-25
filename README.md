@@ -209,6 +209,7 @@ Open the dashboard at http://localhost:3000.
 - v2.3 M3 canary evaluator script: scripts/qa/README.md
 - v2.3 M4 dynamic risk allocation (core): docs/Core-Dynamic-Risk-v2.3-M4.md
 - v2.3 M4 dashboard explainability: docs/Web-Explainability-v2.3-M4.md
+- v2.3 CI / supply-chain stabilization: docs/CI-SupplyChain-Stabilization-v2.3.md
 - v2.3 release notes: docs/Release-Notes-v2.3.md
 - v2.3 PR acceptance template: docs/PR-Template-v2.3-Acceptance.md
 
