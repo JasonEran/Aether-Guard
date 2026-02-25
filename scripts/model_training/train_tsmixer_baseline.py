@@ -4,11 +4,9 @@
 from __future__ import annotations
 
 import argparse
-import json
 import random
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +15,16 @@ import pandas as pd
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
+
+from artifact_registry import (
+    build_run_identity,
+    describe_dataset_file,
+    git_commit,
+    git_is_dirty,
+    materialize_versioned_artifacts,
+    write_json,
+    write_run_manifest,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -93,11 +101,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Export ONNX but skip checker/runtime validation.",
     )
+    parser.add_argument(
+        "--run-version",
+        default="v2.3-m2",
+        help="Version prefix used by artifact naming/manifest.",
+    )
     return parser.parse_args()
-
-
-def now_utc_iso() -> str:
-    return datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def set_global_seed(seed: int) -> None:
@@ -532,13 +541,6 @@ def validate_onnx(
     }
 
 
-def write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
-        json.dump(payload, handle, indent=2, sort_keys=True)
-        handle.write("\n")
-
-
 def main() -> int:
     args = parse_args()
     set_global_seed(args.seed)
@@ -590,6 +592,44 @@ def main() -> int:
             dataset_metadata["requested_dataset"] = str(dataset_path)
             dataset_metadata["fallback_reason"] = "dataset path does not exist"
 
+    run_config = {
+        "seed": args.seed,
+        "window_size": args.window_size,
+        "horizon": args.horizon,
+        "label_threshold": args.label_threshold,
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
+        "learning_rate": args.learning_rate,
+        "weight_decay": args.weight_decay,
+        "dropout": args.dropout,
+        "hidden_size": args.hidden_size,
+        "num_blocks": args.num_blocks,
+        "val_ratio": args.val_ratio,
+        "test_ratio": args.test_ratio,
+        "target_column": args.target_column,
+        "price_column": args.price_column,
+        "timestamp_column": args.timestamp_column,
+        "max_rows": args.max_rows,
+        "synthetic_series": args.synthetic_series,
+        "synthetic_length": args.synthetic_length,
+        "onnx_opset": args.onnx_opset,
+        "skip_onnx_validation": bool(args.skip_onnx_validation),
+    }
+    dataset_for_identity = dict(dataset_metadata)
+    dataset_file_info = describe_dataset_file(dataset_path)
+    if dataset_file_info:
+        dataset_for_identity["dataset_file"] = dataset_file_info
+    repo_root = Path(__file__).resolve().parents[2]
+    git_sha = git_commit(repo_root)
+    git_dirty = git_is_dirty(repo_root)
+    run_id, run_fingerprint = build_run_identity(
+        pipeline="tsmixer-baseline",
+        run_version=args.run_version,
+        config=run_config,
+        dataset=dataset_for_identity,
+        git_sha=git_sha,
+    )
+
     x_train, y_train, x_val, y_val, x_test, y_test = split_dataset(
         x,
         y,
@@ -631,7 +671,8 @@ def main() -> int:
             "channels": channels,
             "train_mean": train_mean.squeeze(0).tolist(),
             "train_std": train_std.squeeze(0).tolist(),
-            "created_at_utc": now_utc_iso(),
+            "run_id": run_id,
+            "run_fingerprint_sha256": run_fingerprint,
         },
         model_path,
     )
@@ -651,25 +692,18 @@ def main() -> int:
         onnx_validation = validate_onnx(model, onnx_path, sample_inputs)
 
     summary = {
-        "run_at_utc": now_utc_iso(),
+        "pipeline": "tsmixer-baseline",
+        "run_version": args.run_version,
+        "run_id": run_id,
         "command": " ".join(["python"] + sys.argv),
-        "config": {
-            "seed": args.seed,
-            "window_size": args.window_size,
-            "horizon": args.horizon,
-            "label_threshold": args.label_threshold,
-            "epochs": args.epochs,
-            "batch_size": args.batch_size,
-            "learning_rate": args.learning_rate,
-            "weight_decay": args.weight_decay,
-            "dropout": args.dropout,
-            "hidden_size": args.hidden_size,
-            "num_blocks": args.num_blocks,
-            "val_ratio": args.val_ratio,
-            "test_ratio": args.test_ratio,
-            "onnx_opset": args.onnx_opset,
-        },
+        "config": run_config,
         "dataset": dataset_metadata,
+        "dataset_file": dataset_file_info,
+        "reproducibility": {
+            "run_fingerprint_sha256": run_fingerprint,
+            "git_commit": git_sha,
+            "git_dirty_worktree": git_dirty,
+        },
         "shapes": {
             "x_train": list(x_train.shape),
             "x_val": list(x_val.shape),
@@ -696,9 +730,39 @@ def main() -> int:
     summary_path = output_dir / "training_summary.json"
     write_json(summary_path, summary)
 
+    base_artifacts = {
+        "torch_model": model_path,
+        "onnx_model": onnx_path,
+        "training_summary": summary_path,
+    }
+    versioned_artifacts = materialize_versioned_artifacts(
+        output_dir=output_dir,
+        pipeline="tsmixer-baseline",
+        run_id=run_id,
+        artifacts=base_artifacts,
+    )
+    manifest_artifacts = dict(base_artifacts)
+    for role, path in versioned_artifacts.items():
+        manifest_artifacts[f"versioned_{role}"] = path
+    manifest_path = write_run_manifest(
+        output_dir=output_dir,
+        pipeline="tsmixer-baseline",
+        run_version=args.run_version,
+        run_id=run_id,
+        run_fingerprint=run_fingerprint,
+        git_sha=git_sha,
+        git_dirty=git_dirty,
+        config=run_config,
+        dataset=dataset_for_identity,
+        metrics=summary["metrics"],
+        artifacts=manifest_artifacts,
+    )
+
     print(f"Model saved: {model_path}")
     print(f"ONNX saved: {onnx_path}")
     print(f"Summary saved: {summary_path}")
+    print(f"Run manifest saved: {manifest_path}")
+    print(f"Run id: {run_id}")
     print(
         "Metrics:"
         f" train_acc={train_metrics.accuracy:.4f}"

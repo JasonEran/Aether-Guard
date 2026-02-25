@@ -46,3 +46,4 @@ Per run output directory contains:
 - `training_summary.json`
 
 These artifacts should be versioned by downstream issue #38 once model governance flow is implemented.
+Artifact versioning is now implemented in issue #38 (see `docs/AI-Artifact-Versioning-v2.3-M2.md`).

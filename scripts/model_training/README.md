@@ -6,6 +6,7 @@ This folder contains the baseline training workflows for Milestone 2:
 - ONNX export for agent-side inference.
 - ONNX validation (checker + onnxruntime parity).
 - Fusion baseline training with semantic vectors (`S_v`, `P_v`, `B_s`) and offline comparison.
+- Artifact manifests + versioned file naming for release-safe model governance.
 
 ## Prerequisites
 
@@ -45,6 +46,8 @@ Each run writes:
 - `tsmixer_baseline.pt`: PyTorch checkpoint (`state_dict` + normalization metadata)
 - `tsmixer_baseline.onnx`: exported ONNX model
 - `training_summary.json`: config, dataset source, metrics, and ONNX validation report
+- `run_manifest.json`: versioned artifact inventory with SHA256 hashes and git metadata
+- `versioned/`: deterministic names following `<pipeline>-<run_id>-<artifact>.<ext>`
 
 ## Reproducibility Notes
 
@@ -90,6 +93,8 @@ Fusion outputs:
 - `telemetry_only_baseline.pt`
 - `fusion_baseline.pt`
 - `fusion_evaluation_summary.json` (contains offline baseline metrics and deltas)
+- `run_manifest.json`
+- `versioned/`
 
 ## Backtest Harness (Issue #37)
 
@@ -107,3 +112,33 @@ Backtest outputs:
 
 - `backtest_summary.json`
 - `backtest_report.md`
+- `run_manifest.json`
+- `versioned/`
+
+## Artifact Versioning + Reproducibility (Issue #38)
+
+All model/backtest scripts now:
+
+- Accept `--run-version` (default `v2.3-m2`).
+- Produce deterministic `run_id` and `run_fingerprint_sha256`.
+- Generate `run_manifest.json` with artifact hashes and git commit metadata.
+
+Quick reproducibility check example (TSMixer):
+
+```bash
+python scripts/model_training/verify_reproducible_run.py \
+  --script scripts/model_training/train_tsmixer_baseline.py \
+  --base-output-dir .tmp/repro-check/tsmixer \
+  --artifacts tsmixer_baseline.pt,tsmixer_baseline.onnx,training_summary.json,run_manifest.json \
+  -- --epochs 6 --batch-size 128
+```
+
+Quick reproducibility check example (Fusion):
+
+```bash
+python scripts/model_training/verify_reproducible_run.py \
+  --script scripts/model_training/train_fusion_baseline.py \
+  --base-output-dir .tmp/repro-check/fusion \
+  --artifacts telemetry_only_baseline.pt,fusion_baseline.pt,fusion_evaluation_summary.json,run_manifest.json \
+  -- --epochs 8 --batch-size 128
+```

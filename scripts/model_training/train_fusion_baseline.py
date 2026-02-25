@@ -4,10 +4,8 @@
 from __future__ import annotations
 
 import argparse
-import json
 import random
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +15,16 @@ import torch
 from sklearn.metrics import average_precision_score, f1_score, precision_score, recall_score, roc_auc_score
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
+
+from artifact_registry import (
+    build_run_identity,
+    describe_dataset_file,
+    git_commit,
+    git_is_dirty,
+    materialize_versioned_artifacts,
+    write_json,
+    write_run_manifest,
+)
 
 
 TELEMETRY_DEFAULT = ["spot_price_usd", "cpu_utilization", "memory_utilization", "network_io"]
@@ -44,11 +52,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--semantic-columns", default=",".join(SEMANTIC_DEFAULT))
     parser.add_argument("--synthetic-series", type=int, default=48)
     parser.add_argument("--synthetic-length", type=int, default=240)
+    parser.add_argument("--run-version", default="v2.3-m2")
     return parser.parse_args()
-
-
-def utc_now() -> str:
-    return datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def set_seed(seed: int) -> None:
@@ -262,9 +267,47 @@ def evaluate(model: nn.Module, x_tel: np.ndarray, x_sem: np.ndarray, y: np.ndarr
 
 
 def main() -> int:
-    args = parse_args(); set_seed(args.seed)
-    out_dir = Path(args.output_dir); out_dir.mkdir(parents=True, exist_ok=True)
+    args = parse_args()
+    set_seed(args.seed)
+    out_dir = Path(args.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    dataset_path = Path(args.dataset_csv) if args.dataset_csv else None
+    dataset_file_info = describe_dataset_file(dataset_path)
     x_tel, x_sem, y, ds_meta = load_dataset(args)
+    run_config = {
+        "seed": args.seed,
+        "window_size": args.window_size,
+        "horizon": args.horizon,
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
+        "learning_rate": args.learning_rate,
+        "weight_decay": args.weight_decay,
+        "hidden_size": args.hidden_size,
+        "dropout": args.dropout,
+        "val_ratio": args.val_ratio,
+        "test_ratio": args.test_ratio,
+        "label_column": args.label_column,
+        "label_threshold": args.label_threshold,
+        "telemetry_columns": args.telemetry_columns,
+        "semantic_columns": args.semantic_columns,
+        "synthetic_series": args.synthetic_series,
+        "synthetic_length": args.synthetic_length,
+    }
+    ds_for_identity = dict(ds_meta)
+    if dataset_file_info:
+        ds_for_identity["dataset_file"] = dataset_file_info
+    repo_root = Path(__file__).resolve().parents[2]
+    git_sha = git_commit(repo_root)
+    git_dirty = git_is_dirty(repo_root)
+    run_id, run_fingerprint = build_run_identity(
+        pipeline="fusion-baseline",
+        run_version=args.run_version,
+        config=run_config,
+        dataset=ds_for_identity,
+        git_sha=git_sha,
+    )
+
     splits, norm = split_standardize(x_tel, x_sem, y, args)
     tr_t, tr_s, tr_y, va_t, va_s, va_y, te_t, te_s, te_y = splits
     tel_dim, sem_dim = tr_t.shape[2], tr_s.shape[1]
@@ -280,15 +323,40 @@ def main() -> int:
     tel_m = {"train": evaluate(tel_model, tr_t, tr_s, tr_y), "val": evaluate(tel_model, va_t, va_s, va_y), "test": evaluate(tel_model, te_t, te_s, te_y)}
     fus_m = {"train": evaluate(fus_model, tr_t, tr_s, tr_y), "val": evaluate(fus_model, va_t, va_s, va_y), "test": evaluate(fus_model, te_t, te_s, te_y)}
 
-    tel_path = out_dir / "telemetry_only_baseline.pt"; fus_path = out_dir / "fusion_baseline.pt"
-    torch.save({"state_dict": tel_model.state_dict(), "normalization": norm, "created_at_utc": utc_now()}, tel_path)
-    torch.save({"state_dict": fus_model.state_dict(), "normalization": norm, "created_at_utc": utc_now()}, fus_path)
+    tel_path = out_dir / "telemetry_only_baseline.pt"
+    fus_path = out_dir / "fusion_baseline.pt"
+    torch.save(
+        {
+            "state_dict": tel_model.state_dict(),
+            "normalization": norm,
+            "run_id": run_id,
+            "run_fingerprint_sha256": run_fingerprint,
+        },
+        tel_path,
+    )
+    torch.save(
+        {
+            "state_dict": fus_model.state_dict(),
+            "normalization": norm,
+            "run_id": run_id,
+            "run_fingerprint_sha256": run_fingerprint,
+        },
+        fus_path,
+    )
 
     summary = {
-        "run_at_utc": utc_now(),
+        "pipeline": "fusion-baseline",
+        "run_version": args.run_version,
+        "run_id": run_id,
         "command": " ".join(["python"] + sys.argv),
         "dataset": ds_meta,
-        "config": {k: getattr(args, k) for k in ["seed", "window_size", "horizon", "epochs", "batch_size", "learning_rate", "weight_decay", "hidden_size", "dropout", "label_column", "label_threshold"]},
+        "dataset_file": dataset_file_info,
+        "config": run_config,
+        "reproducibility": {
+            "run_fingerprint_sha256": run_fingerprint,
+            "git_commit": git_sha,
+            "git_dirty_worktree": git_dirty,
+        },
         "label_balance": {"train_positive_rate": float(np.mean(tr_y)), "val_positive_rate": float(np.mean(va_y)), "test_positive_rate": float(np.mean(te_y))},
         "models": {"telemetry_only": {"metrics": tel_m, "history": tel_hist, "artifact": str(tel_path)}, "fusion": {"metrics": fus_m, "history": fus_hist, "artifact": str(fus_path)}},
         "comparison": {
@@ -297,13 +365,45 @@ def main() -> int:
         },
     }
     summary_path = out_dir / "fusion_evaluation_summary.json"
-    with summary_path.open("w", encoding="utf-8") as f:
-        json.dump(summary, f, indent=2, sort_keys=True)
-        f.write("\n")
+    write_json(summary_path, summary)
+
+    base_artifacts = {
+        "telemetry_model": tel_path,
+        "fusion_model": fus_path,
+        "evaluation_summary": summary_path,
+    }
+    versioned_artifacts = materialize_versioned_artifacts(
+        output_dir=out_dir,
+        pipeline="fusion-baseline",
+        run_id=run_id,
+        artifacts=base_artifacts,
+    )
+    manifest_artifacts = dict(base_artifacts)
+    for role, path in versioned_artifacts.items():
+        manifest_artifacts[f"versioned_{role}"] = path
+    manifest_path = write_run_manifest(
+        output_dir=out_dir,
+        pipeline="fusion-baseline",
+        run_version=args.run_version,
+        run_id=run_id,
+        run_fingerprint=run_fingerprint,
+        git_sha=git_sha,
+        git_dirty=git_dirty,
+        config=run_config,
+        dataset=ds_for_identity,
+        metrics={
+            "telemetry_only_test": tel_m["test"],
+            "fusion_test": fus_m["test"],
+            "comparison": summary["comparison"],
+        },
+        artifacts=manifest_artifacts,
+    )
 
     print(f"Telemetry-only model saved: {tel_path}")
     print(f"Fusion model saved: {fus_path}")
     print(f"Summary saved: {summary_path}")
+    print(f"Run manifest saved: {manifest_path}")
+    print(f"Run id: {run_id}")
     print(
         f"Test F1: telemetry={tel_m['test']['f1']:.4f} "
         f"fusion={fus_m['test']['f1']:.4f} "

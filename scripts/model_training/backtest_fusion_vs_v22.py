@@ -4,12 +4,10 @@
 from __future__ import annotations
 
 import argparse
-import json
 import random
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +16,16 @@ import pandas as pd
 import torch
 from sklearn.metrics import average_precision_score, f1_score, precision_score, recall_score, roc_auc_score
 from torch import nn
+
+from artifact_registry import (
+    build_run_identity,
+    describe_dataset_file,
+    git_commit,
+    git_is_dirty,
+    materialize_versioned_artifacts,
+    write_json,
+    write_run_manifest,
+)
 
 
 TELEMETRY_DEFAULT = ["spot_price_usd", "cpu_utilization", "memory_utilization", "network_io"]
@@ -47,11 +55,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--autotrain-if-missing", action="store_true", default=True)
     parser.add_argument("--autotrain-epochs", type=int, default=8)
     parser.add_argument("--autotrain-output-dir", default=".tmp/fusion-baseline-autotrain")
+    parser.add_argument("--run-version", default="v2.3-m2")
     return parser.parse_args()
-
-
-def utc_now() -> str:
-    return datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def set_seed(seed: int) -> None:
@@ -313,6 +318,8 @@ def main() -> int:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    dataset_path = Path(args.dataset_csv) if args.dataset_csv else None
+    dataset_file_info = describe_dataset_file(dataset_path)
     x_tel, x_sem, y, dataset_meta = load_dataset(args)
     total = x_tel.shape[0]
     holdout_count = int(total * args.backtest_ratio)
@@ -325,9 +332,43 @@ def main() -> int:
     y_holdout = y[start:]
 
     checkpoint_path = ensure_checkpoint(args)
+    checkpoint_file_info = describe_dataset_file(checkpoint_path)
     checkpoint = torch.load(checkpoint_path, map_location="cpu")
     state_dict = checkpoint.get("state_dict", checkpoint)
     normalization = checkpoint.get("normalization")
+
+    run_config = {
+        "seed": args.seed,
+        "window_size": args.window_size,
+        "horizon": args.horizon,
+        "backtest_ratio": args.backtest_ratio,
+        "decision_threshold": args.decision_threshold,
+        "label_column": args.label_column,
+        "label_threshold": args.label_threshold,
+        "telemetry_columns": args.telemetry_columns,
+        "semantic_columns": args.semantic_columns,
+        "synthetic_series": args.synthetic_series,
+        "synthetic_length": args.synthetic_length,
+        "fusion_checkpoint": checkpoint_path.as_posix(),
+        "autotrain_if_missing": bool(args.autotrain_if_missing),
+        "autotrain_epochs": args.autotrain_epochs,
+        "autotrain_output_dir": args.autotrain_output_dir,
+    }
+    dataset_for_identity = dict(dataset_meta)
+    if dataset_file_info:
+        dataset_for_identity["dataset_file"] = dataset_file_info
+    if checkpoint_file_info:
+        dataset_for_identity["fusion_checkpoint_file"] = checkpoint_file_info
+    repo_root = Path(__file__).resolve().parents[2]
+    git_sha = git_commit(repo_root)
+    git_dirty = git_is_dirty(repo_root)
+    run_id, run_fingerprint = build_run_identity(
+        pipeline="fusion-backtest",
+        run_version=args.run_version,
+        config=run_config,
+        dataset=dataset_for_identity,
+        git_sha=git_sha,
+    )
 
     hidden = int(state_dict["tel.1.weight"].shape[0])
     tel_dim = int(x_tel_holdout_raw.shape[2])
@@ -364,16 +405,18 @@ def main() -> int:
         auroc_delta = fusion_metrics.auroc - heuristic_metrics.auroc
 
     summary = {
-        "run_at_utc": utc_now(),
+        "pipeline": "fusion-backtest",
+        "run_version": args.run_version,
+        "run_id": run_id,
         "command": " ".join(["python"] + sys.argv),
         "dataset": dataset_meta,
-        "config": {
-            "seed": args.seed,
-            "window_size": args.window_size,
-            "horizon": args.horizon,
-            "backtest_ratio": args.backtest_ratio,
-            "decision_threshold": args.decision_threshold,
-            "fusion_checkpoint": str(checkpoint_path),
+        "dataset_file": dataset_file_info,
+        "fusion_checkpoint_file": checkpoint_file_info,
+        "config": run_config,
+        "reproducibility": {
+            "run_fingerprint_sha256": run_fingerprint,
+            "git_commit": git_sha,
+            "git_dirty_worktree": git_dirty,
         },
         "counts": {
             "total_windows": int(total),
@@ -393,14 +436,12 @@ def main() -> int:
     }
 
     summary_path = output_dir / "backtest_summary.json"
-    with summary_path.open("w", encoding="utf-8") as handle:
-        json.dump(summary, handle, indent=2, sort_keys=True)
-        handle.write("\n")
+    write_json(summary_path, summary)
 
     report = output_dir / "backtest_report.md"
     with report.open("w", encoding="utf-8") as handle:
         handle.write("# Backtest Report: v2.3 Fusion vs v2.2 Heuristic\n\n")
-        handle.write(f"- Generated at UTC: {summary['run_at_utc']}\n")
+        handle.write(f"- Run id: {run_id}\n")
         handle.write(f"- Hold-out windows: {summary['counts']['holdout_windows']}\n")
         handle.write(f"- Hold-out positive rate: {summary['counts']['holdout_positive_rate']:.4f}\n\n")
         handle.write("| Strategy | Accuracy | Precision | Recall | F1 | AUROC | AP |\n")
@@ -426,8 +467,42 @@ def main() -> int:
         else:
             handle.write(f"- AUROC delta: {auroc_delta:.4f}\n")
 
+    base_artifacts = {
+        "backtest_summary": summary_path,
+        "backtest_report": report,
+    }
+    versioned_artifacts = materialize_versioned_artifacts(
+        output_dir=output_dir,
+        pipeline="fusion-backtest",
+        run_id=run_id,
+        artifacts=base_artifacts,
+    )
+    manifest_artifacts = dict(base_artifacts)
+    for role, path in versioned_artifacts.items():
+        manifest_artifacts[f"versioned_{role}"] = path
+    manifest_artifacts["input_fusion_checkpoint"] = checkpoint_path
+    manifest_path = write_run_manifest(
+        output_dir=output_dir,
+        pipeline="fusion-backtest",
+        run_version=args.run_version,
+        run_id=run_id,
+        run_fingerprint=run_fingerprint,
+        git_sha=git_sha,
+        git_dirty=git_dirty,
+        config=run_config,
+        dataset=dataset_for_identity,
+        metrics={
+            "v22_heuristic": summary["metrics"]["v22_heuristic"],
+            "v23_fusion": summary["metrics"]["v23_fusion"],
+            "comparison": summary["comparison"],
+        },
+        artifacts=manifest_artifacts,
+    )
+
     print(f"Backtest summary saved: {summary_path}")
     print(f"Backtest report saved: {report}")
+    print(f"Run manifest saved: {manifest_path}")
+    print(f"Run id: {run_id}")
     print(
         "F1 comparison:"
         f" v2.2={heuristic_metrics.f1:.4f}"
