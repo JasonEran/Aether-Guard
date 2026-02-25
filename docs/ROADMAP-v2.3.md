@@ -44,6 +44,7 @@ minimize integration risk while preserving backward compatibility with the v2.2 
 ### Milestone 2: Fusion and Forecasting (Offline)
 
 **Goal**: Train and evaluate models with historical replay.
+**Status**: Completed (2026-02-25)
 
 - Add TSMixer baseline for numerical telemetry (PyTorch), with export to ONNX for agent inference.
 - Fuse exogenous semantic vectors for `P(Preemption | Telemetry, Signals)`.
@@ -57,6 +58,7 @@ minimize integration risk while preserving backward compatibility with the v2.2 
 ### Milestone 3: Federated Inference (Online)
 
 **Goal**: Deliver semantic vectors to agents and run local inference.
+**Status**: Completed (2026-02-25)
 
 - Extend gRPC heartbeat payload with semantic features.
 - Deploy lightweight on-agent inference (TSMixer).
@@ -70,6 +72,7 @@ minimize integration risk while preserving backward compatibility with the v2.2 
 ### Milestone 4: Dynamic Risk Management
 
 **Goal**: Replace static thresholds with dynamic risk allocation.
+**Status**: Completed (2026-02-25)
 
 - Implement confidence score and risk allocation factor.
 - Add guardrails (max migration rate, minimum cool-down windows).

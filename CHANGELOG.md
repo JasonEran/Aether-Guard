@@ -23,6 +23,7 @@ Semantic Versioning.
 - Expanded v2.3 roadmap with model choices, data sources, and validation guidance.
 - Verification scripts now support API key headers and optional agent build flags.
 - Optional HTTP listener when mTLS is enabled to keep dashboard/AI traffic on port 8080.
+- v2.3 release notes (`docs/Release-Notes-v2.3.md`) and PR acceptance template (`docs/PR-Template-v2.3-Acceptance.md`).
 
 ### Changed
 - Agent now injects W3C trace headers for HTTP requests.

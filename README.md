@@ -18,7 +18,7 @@ v2.2 reference architecture with a concrete implementation guide.
 
 ## Project Status
 
-- Stage: v2.2 baseline delivered (Phase 0-4). v2.3 Milestone 1 delivered; Milestone 2+ tracked in docs/ROADMAP-v2.3.md.
+- Stage: v2.2 baseline delivered (Phase 0-4). v2.3 Milestones 1-4 delivered.
 - License: MIT
 - Authors: Qi Junyi, Xiao Erdong (2026)
 - Sponsor: https://github.com/sponsors/JasonEran
@@ -131,10 +131,10 @@ This project targets a product-grade release, not a demo. The following standard
 - [x] Add snapshot retention automation and S3 lifecycle policy support.
 - [x] Generate SBOMs and sign container images with cosign in CI.
 
-## v2.3 Preview (Roadmap)
+## v2.3 Delivery (Roadmap)
 
-We keep the current README focused on v2.2 implementation details. The next evolution is documented in
-`docs/ARCHITECTURE-v2.3.md`. In brief, v2.3 moves from reactive thresholds to predictive, multimodal risk allocation:
+v2.3 architecture and delivery detail are documented in `docs/ARCHITECTURE-v2.3.md` and
+`docs/ROADMAP-v2.3.md`. In brief, v2.3 moves from reactive thresholds to predictive, multimodal risk allocation:
 
 - Multimodal inputs: telemetry plus external cloud signals (status pages, incident reports, capacity advisories).
 - Lightweight time-series forecasting on agents, with semantic enrichment computed in the control plane.
@@ -209,6 +209,8 @@ Open the dashboard at http://localhost:3000.
 - v2.3 M3 canary evaluator script: scripts/qa/README.md
 - v2.3 M4 dynamic risk allocation (core): docs/Core-Dynamic-Risk-v2.3-M4.md
 - v2.3 M4 dashboard explainability: docs/Web-Explainability-v2.3-M4.md
+- v2.3 release notes: docs/Release-Notes-v2.3.md
+- v2.3 PR acceptance template: docs/PR-Template-v2.3-Acceptance.md
 
 If you want to simulate migrations, start at least two agents:
 

@@ -1,5 +1,8 @@
 # Pull Request
 
+For v2.3 release-track PRs, you can use:
+`docs/PR-Template-v2.3-Acceptance.md`
+
 ## Summary
 Describe the changes and their purpose.
 
