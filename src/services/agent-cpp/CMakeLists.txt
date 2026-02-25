@@ -11,6 +11,7 @@ option(AETHER_ENABLE_GRPC "Build gRPC stubs for agent protos." ON)
 option(AETHER_USE_LOCAL_PROTOBUF "Use third_party/protobuf when available." ON)
 option(AETHER_GRPC_USE_ARCHIVE "Use gRPC release archive (no submodules)." OFF)
 option(AETHER_ENABLE_OTEL "Enable OpenTelemetry spans for the agent." OFF)
+option(AETHER_ENABLE_ONNX_RUNTIME "Enable ONNX Runtime local inference on the agent." OFF)
 
 # CMake < 3.24 doesn't understand DOWNLOAD_EXTRACT_TIMESTAMP, which breaks ExternalProject.
 set(_AETHER_FC_EXTRACT_TIMESTAMP)
@@ -253,6 +254,7 @@ add_executable(AetherAgent
     CriuManager.cpp
     CommandDispatcher.cpp
     CommandPoller.cpp
+    InferenceEngine.cpp
     main.cpp
     LifecycleManager.cpp
     NetworkClient.cpp
@@ -268,7 +270,31 @@ target_link_libraries(AetherAgent
 target_compile_definitions(AetherAgent
     PRIVATE
     $<$<BOOL:${AETHER_ENABLE_OTEL}>:AETHER_ENABLE_OTEL=1>
+    $<$<BOOL:${AETHER_ENABLE_ONNX_RUNTIME}>:AETHER_ENABLE_ONNX_RUNTIME=1>
 )
+
+if(AETHER_ENABLE_ONNX_RUNTIME)
+    set(ONNXRUNTIME_ROOT "" CACHE PATH "Path to ONNX Runtime distribution root (contains include/ and lib/).")
+    if(NOT ONNXRUNTIME_ROOT)
+        message(FATAL_ERROR "AETHER_ENABLE_ONNX_RUNTIME=ON requires ONNXRUNTIME_ROOT to be set.")
+    endif()
+
+    set(ONNXRUNTIME_INCLUDE_DIR "${ONNXRUNTIME_ROOT}/include")
+    if(NOT EXISTS "${ONNXRUNTIME_INCLUDE_DIR}")
+        message(FATAL_ERROR "ONNX Runtime include directory not found: ${ONNXRUNTIME_INCLUDE_DIR}")
+    endif()
+
+    find_library(ONNXRUNTIME_LIBRARY
+        NAMES onnxruntime onnxruntime.lib
+        PATHS "${ONNXRUNTIME_ROOT}/lib"
+        NO_DEFAULT_PATH)
+    if(NOT ONNXRUNTIME_LIBRARY)
+        message(FATAL_ERROR "Unable to find ONNX Runtime library under ${ONNXRUNTIME_ROOT}/lib")
+    endif()
+
+    target_include_directories(AetherAgent PRIVATE "${ONNXRUNTIME_INCLUDE_DIR}")
+    target_link_libraries(AetherAgent PRIVATE "${ONNXRUNTIME_LIBRARY}")
+endif()
 
 if(AETHER_ENABLE_OTEL)
     set(_AETHER_OTEL_TARGETS
@@ -308,3 +334,25 @@ target_include_directories(AetherAgentTests
 )
 
 add_test(NAME AetherAgentTests COMMAND AetherAgentTests)
+
+add_executable(AetherAgentInferenceTests
+    InferenceEngine.cpp
+    tests/InferenceEngineTests.cpp
+)
+
+target_include_directories(AetherAgentInferenceTests
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_compile_definitions(AetherAgentInferenceTests
+    PRIVATE
+    $<$<BOOL:${AETHER_ENABLE_ONNX_RUNTIME}>:AETHER_ENABLE_ONNX_RUNTIME=1>
+)
+
+if(AETHER_ENABLE_ONNX_RUNTIME)
+    target_include_directories(AetherAgentInferenceTests PRIVATE "${ONNXRUNTIME_INCLUDE_DIR}")
+    target_link_libraries(AetherAgentInferenceTests PRIVATE "${ONNXRUNTIME_LIBRARY}")
+endif()
+
+add_test(NAME AetherAgentInferenceTests COMMAND AetherAgentInferenceTests)

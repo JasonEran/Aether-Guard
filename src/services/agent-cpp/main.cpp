@@ -1,4 +1,5 @@
 #include "CommandPoller.hpp"
+#include "InferenceEngine.hpp"
 #include "LifecycleManager.hpp"
 #include "NetworkClient.hpp"
 #include "Tracing.hpp"
@@ -108,6 +109,19 @@ bool GetEnvBool(const char* name, bool defaultValue) {
     return defaultValue;
 }
 
+double GetEnvDouble(const char* name, double defaultValue) {
+    EnvValue value = GetEnvValue(name);
+    if (!value.found || value.value.empty()) {
+        return defaultValue;
+    }
+
+    try {
+        return std::stod(value.value);
+    } catch (...) {
+        return defaultValue;
+    }
+}
+
 bool WaitForTlsFiles(const TlsSettings& settings, int timeoutSeconds) {
     if (settings.certPath.empty() || settings.keyPath.empty() || settings.caPath.empty()) {
         return false;
@@ -207,6 +221,21 @@ int main() {
         std::cerr << "[Agent] Pre-flight check failed. Proceeding with heartbeat in IDLE state." << std::endl;
     }
 
+    InferenceRuntimeConfig inferenceConfig;
+    inferenceConfig.enabled = GetEnvBool("AG_M3_ONLINE_INFERENCE_ENABLED", false);
+    inferenceConfig.forceV22Fallback = GetEnvBool("AG_M3_FORCE_V22_FALLBACK", false);
+    inferenceConfig.failOpen = GetEnvBool("AG_ONNX_FAIL_OPEN", true);
+    inferenceConfig.modelPath = GetEnvOrDefault("AG_ONNX_MODEL_PATH", "");
+    inferenceConfig.decisionThreshold = GetEnvDouble("AG_ONNX_DECISION_THRESHOLD", 0.65);
+
+    InferenceEngine inferenceEngine(inferenceConfig);
+    const bool inferenceInitialized = inferenceEngine.Initialize();
+    std::cout << "[Agent] Inference init status: " << inferenceEngine.InitializationStatus() << std::endl;
+    if (!inferenceInitialized && !inferenceConfig.failOpen) {
+        std::cerr << "[Agent] Inference initialization failed and fail-open is disabled. Exiting." << std::endl;
+        return 1;
+    }
+
     const std::string tier = "T2";
     const std::string state = "IDLE";
     CommandDispatcher dispatcher(client, lifecycle, agentId);
@@ -215,10 +244,19 @@ int main() {
 
     while (true) {
         std::vector<AgentCommand> commands;
-        bool heartbeatSent = client.SendHeartbeat(token, agentId, state, tier, commands);
+        SemanticHeartbeatFeatures semanticFeatures;
+        bool heartbeatSent = client.SendHeartbeat(token, agentId, state, tier, commands, &semanticFeatures);
 
         if (heartbeatSent) {
             std::cout << "[Agent] Heartbeat sent." << std::endl;
+            if (semanticFeatures.present) {
+                InferenceDecision decision = inferenceEngine.Evaluate(semanticFeatures);
+                std::cout << "[Agent][Inference] prob=" << decision.probability
+                          << " preempt=" << (decision.shouldPreempt ? "yes" : "no")
+                          << " mode=" << (decision.usedOnnxRuntime ? "onnx" : "fallback")
+                          << " reason=" << decision.reason
+                          << std::endl;
+            }
         } else {
             std::cerr << "[Agent] Failed to send heartbeat" << std::endl;
         }
