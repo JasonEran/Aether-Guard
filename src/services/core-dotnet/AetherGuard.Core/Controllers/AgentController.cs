@@ -90,7 +90,23 @@ public class AgentController : ControllerBase
             })
             .ToArray();
 
-        return Ok(new { status = result.Payload.Status, commands = commandPayload });
+        var semantic = result.Payload.SemanticFeatures;
+        var semanticPayload = semantic is null
+            ? null
+            : new
+            {
+                schemaVersion = semantic.SchemaVersion,
+                sVNegative = semantic.SVNegative,
+                sVNeutral = semantic.SVNeutral,
+                sVPositive = semantic.SVPositive,
+                pV = semantic.PV,
+                bS = semantic.BS,
+                source = semantic.Source,
+                generatedAtUnix = semantic.GeneratedAtUnix,
+                fallbackUsed = semantic.FallbackUsed
+            };
+
+        return Ok(new { status = result.Payload.Status, commands = commandPayload, semanticFeatures = semanticPayload });
     }
 
     [HttpGet("poll")]

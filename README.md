@@ -202,6 +202,7 @@ Open the dashboard at http://localhost:3000.
 - v2.3 M2 backtesting guide: docs/AI-Backtesting-v2.3-M2.md
 - v2.3 M2 artifact versioning + reproducibility guide: docs/AI-Artifact-Versioning-v2.3-M2.md
 - v2.3 M2 model training scripts: scripts/model_training/README.md
+- v2.3 M3 heartbeat semantic payload contract: docs/PROTO-Heartbeat-Semantic-v2.3-M3.md
 
 If you want to simulate migrations, start at least two agents:
 

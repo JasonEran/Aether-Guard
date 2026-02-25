@@ -77,9 +77,22 @@ message AgentConfig {
   string node_mode = 5;
 }
 
+message SemanticHeartbeatFeatures {
+  string schema_version = 1;
+  double s_v_negative = 2;
+  double s_v_neutral = 3;
+  double s_v_positive = 4;
+  double p_v = 5;
+  double b_s = 6;
+  string source = 7;
+  int64 generated_at_unix = 8;
+  bool fallback_used = 9;
+}
+
 message HeartbeatResponse {
   string status = 1;
   repeated aetherguard.common.v1.AgentCommand commands = 2;
+  SemanticHeartbeatFeatures semantic_features = 3;
 }
 
 message PollCommandsRequest {

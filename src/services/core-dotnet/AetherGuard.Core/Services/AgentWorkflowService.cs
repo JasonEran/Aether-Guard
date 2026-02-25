@@ -107,7 +107,11 @@ public class AgentWorkflowService
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        var response = new HeartbeatResponse { Status = "active" };
+        var response = new HeartbeatResponse
+        {
+            Status = "active",
+            SemanticFeatures = await BuildSemanticFeaturesAsync(cancellationToken)
+        };
         response.Commands.AddRange(pendingCommands.Select(MapCommand));
 
         return ApiResult<HeartbeatResponse>.Ok(response);
@@ -214,6 +218,71 @@ public class AgentWorkflowService
         }
 
         return ApiResult<FeedbackResponse>.Ok(new FeedbackResponse { Status = command.Status });
+    }
+
+    private async Task<SemanticHeartbeatFeatures> BuildSemanticFeaturesAsync(CancellationToken cancellationToken)
+    {
+        var latest = await _context.ExternalSignals
+            .AsNoTracking()
+            .Where(signal =>
+                signal.SentimentNegative.HasValue &&
+                signal.SentimentNeutral.HasValue &&
+                signal.SentimentPositive.HasValue &&
+                signal.VolatilityProbability.HasValue &&
+                signal.SupplyBias.HasValue)
+            .OrderByDescending(signal => signal.EnrichedAt ?? signal.PublishedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (latest is null)
+        {
+            return BuildFallbackSemanticFeatures();
+        }
+
+        var generatedAt = latest.EnrichedAt ?? latest.PublishedAt;
+        return new SemanticHeartbeatFeatures
+        {
+            SchemaVersion = string.IsNullOrWhiteSpace(latest.EnrichmentSchemaVersion)
+                ? "1.0"
+                : latest.EnrichmentSchemaVersion,
+            SVNegative = Clamp01(latest.SentimentNegative),
+            SVNeutral = Clamp01(latest.SentimentNeutral),
+            SVPositive = Clamp01(latest.SentimentPositive),
+            PV = Clamp01(latest.VolatilityProbability),
+            BS = Clamp01(latest.SupplyBias),
+            Source = latest.Source,
+            GeneratedAtUnix = generatedAt.ToUnixTimeSeconds(),
+            FallbackUsed = false
+        };
+    }
+
+    private static SemanticHeartbeatFeatures BuildFallbackSemanticFeatures()
+        => new()
+        {
+            SchemaVersion = "1.0",
+            SVNegative = 0.33,
+            SVNeutral = 0.34,
+            SVPositive = 0.33,
+            PV = 0.5,
+            BS = 0.5,
+            Source = "fallback:neutral",
+            GeneratedAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            FallbackUsed = true
+        };
+
+    private static double Clamp01(double? value)
+    {
+        var resolved = value ?? 0.0;
+        if (resolved < 0.0)
+        {
+            return 0.0;
+        }
+
+        if (resolved > 1.0)
+        {
+            return 1.0;
+        }
+
+        return resolved;
     }
 
     private static AetherGuard.Grpc.V1.AgentCommand MapCommand(CoreAgentCommand command)
