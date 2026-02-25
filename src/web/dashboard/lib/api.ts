@@ -1,4 +1,4 @@
-import type { Agent, AuditLog } from '../types';
+import type { Agent, AuditLog, ExternalSignal, ExternalSignalFeedState } from '../types';
 
 export interface RiskPoint {
   timestamp: string;
@@ -18,6 +18,17 @@ interface CoreLatestResponse {
     confidence: number;
     predictedCpu: number;
     rootCause: string;
+    alpha?: number;
+    preemptProbability?: number;
+    decisionScore?: number;
+    rationale?: string;
+    topSignals?: Array<{
+      key: string;
+      label: string;
+      value: number;
+      source: string;
+      detail: string;
+    }>;
   };
 }
 
@@ -100,6 +111,11 @@ export async function fetchFleetStatus(): Promise<Agent[]> {
         rootCause: analysis?.rootCause,
         rebalanceSignal: telemetry.rebalanceSignal,
         diskAvailable: telemetry.diskAvailable,
+        alpha: analysis?.alpha,
+        preemptProbability: analysis?.preemptProbability,
+        decisionScore: analysis?.decisionScore,
+        decisionRationale: analysis?.rationale,
+        topSignals: analysis?.topSignals,
       },
     ];
   } catch (error) {
@@ -165,5 +181,36 @@ export async function sendChaosSignal(): Promise<void> {
   if (!response.ok) {
     const message = await response.text();
     throw new Error(message || 'Chaos signal failed.');
+  }
+}
+
+export async function fetchExternalSignals(limit = 6): Promise<ExternalSignal[]> {
+  try {
+    const params = new URLSearchParams({ limit: limit.toString() });
+    const response = await fetch(`/api/signals?${params.toString()}`, { cache: 'no-store' });
+    if (!response.ok) {
+      return [];
+    }
+
+    const data = (await response.json()) as ExternalSignal[];
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('[Dashboard] Failed to fetch external signals', error);
+    return [];
+  }
+}
+
+export async function fetchExternalSignalFeeds(): Promise<ExternalSignalFeedState[]> {
+  try {
+    const response = await fetch('/api/signals/feeds', { cache: 'no-store' });
+    if (!response.ok) {
+      return [];
+    }
+
+    const data = (await response.json()) as ExternalSignalFeedState[];
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('[Dashboard] Failed to fetch external signal feeds', error);
+    return [];
   }
 }

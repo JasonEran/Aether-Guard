@@ -8,6 +8,7 @@ opentelemetry-exporter-otlp
 opentelemetry-instrumentation-fastapi
 opentelemetry-instrumentation-requests
 torch
+transformers>=4.39.0
 numpy
 pandas
 scikit-learn

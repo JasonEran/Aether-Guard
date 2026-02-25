@@ -31,6 +31,21 @@ const formatPrediction = (value?: number) => {
   return `${Math.round(value)}%`;
 };
 
+const formatRatio = (value?: number) => {
+  if (value === undefined || Number.isNaN(value)) {
+    return '--';
+  }
+  const normalized = value > 1 ? value / 100 : value;
+  return `${(Math.max(0, Math.min(1, normalized)) * 100).toFixed(1)}%`;
+};
+
+const formatAlpha = (value?: number) => {
+  if (value === undefined || Number.isNaN(value)) {
+    return '--';
+  }
+  return value.toFixed(2);
+};
+
 const formatDiskAvailable = (value?: number) => {
   if (value === undefined || Number.isNaN(value)) {
     return '--';
@@ -47,9 +62,26 @@ const formatRootCause = (value?: string) => {
   return normalized;
 };
 
+const formatSignalValue = (key: string, value: number) => {
+  if (!Number.isFinite(value)) {
+    return '--';
+  }
+
+  if (key === 'rebalance_signal') {
+    return value >= 0.5 ? 'Active' : 'Inactive';
+  }
+
+  if (key.includes('probability') || key === 'sentiment_pressure') {
+    return formatRatio(value);
+  }
+
+  return value.toFixed(2);
+};
+
 export default function ExplainabilityPanel({ agent, usingMock }: ExplainabilityPanelProps) {
   const statusLabel = agent?.analysisStatus?.trim().toUpperCase() || 'PENDING';
   const statusClass = statusStyles[statusLabel] ?? statusStyles.PENDING;
+  const rationale = agent?.decisionRationale?.trim() || 'Awaiting dynamic risk decision details.';
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-[0_0_40px_rgba(15,23,42,0.6)]">
@@ -78,6 +110,20 @@ export default function ExplainabilityPanel({ agent, usingMock }: Explainability
               </div>
             </div>
             <div className="space-y-3">
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Risk Factors</div>
+              <div className="text-sm text-slate-200">
+                alpha: <span className="text-slate-300">{formatAlpha(agent.alpha)}</span>
+              </div>
+              <div className="text-sm text-slate-200">
+                P_preempt:{' '}
+                <span className="text-slate-300">{formatRatio(agent.preemptProbability)}</span>
+              </div>
+              <div className="text-sm text-slate-200">
+                Decision Score:{' '}
+                <span className="text-slate-300">{formatRatio(agent.decisionScore)}</span>
+              </div>
+            </div>
+            <div className="space-y-3">
               <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Telemetry Context</div>
               <div className="text-sm text-slate-200">
                 Rebalance Signal:{' '}
@@ -89,6 +135,30 @@ export default function ExplainabilityPanel({ agent, usingMock }: Explainability
                 Disk Available: <span className="text-slate-300">{formatDiskAvailable(agent.diskAvailable)}</span>
               </div>
             </div>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+            <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Top Signals</div>
+            <div className="mt-2 space-y-2 text-sm text-slate-200">
+              {(agent.topSignals ?? []).length === 0 ? (
+                <div className="text-slate-400">Awaiting fused signal inputs.</div>
+              ) : (
+                (agent.topSignals ?? []).slice(0, 3).map((signal) => (
+                  <div key={signal.key} className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-slate-100">{signal.label}</span>
+                      <span className="text-slate-300">{formatSignalValue(signal.key, signal.value)}</span>
+                    </div>
+                    <div className="mt-1 text-xs text-slate-400">{signal.detail}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+            <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Decision Rationale</div>
+            <div className="mt-2 text-sm text-slate-200">{rationale}</div>
           </div>
 
           <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/40 p-4">

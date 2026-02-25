@@ -52,7 +52,8 @@ public class AgentController : ControllerBase
                 enableEbpf = config.EnableEbpf,
                 enableNetTopology = config.EnableNetTopology,
                 enableChaos = config.EnableChaos,
-                nodeMode = config.NodeMode
+                nodeMode = config.NodeMode,
+                enableLocalInference = config.EnableLocalInference
             };
 
         return Ok(new { token = result.Payload?.Token, agentId = result.Payload?.AgentId, config = configPayload });
@@ -90,7 +91,23 @@ public class AgentController : ControllerBase
             })
             .ToArray();
 
-        return Ok(new { status = result.Payload.Status, commands = commandPayload });
+        var semantic = result.Payload.SemanticFeatures;
+        var semanticPayload = semantic is null
+            ? null
+            : new
+            {
+                schemaVersion = semantic.SchemaVersion,
+                sVNegative = semantic.SVNegative,
+                sVNeutral = semantic.SVNeutral,
+                sVPositive = semantic.SVPositive,
+                pV = semantic.PV,
+                bS = semantic.BS,
+                source = semantic.Source,
+                generatedAtUnix = semantic.GeneratedAtUnix,
+                fallbackUsed = semantic.FallbackUsed
+            };
+
+        return Ok(new { status = result.Payload.Status, commands = commandPayload, semanticFeatures = semanticPayload });
     }
 
     [HttpGet("poll")]

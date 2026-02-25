@@ -21,12 +21,12 @@ public class ControlPlaneGrpcService : ControlPlane.ControlPlaneBase
         return HandleResult(result);
     }
 
-    public override Task<DashboardLatestResponse> GetDashboardLatest(
+    public override async Task<DashboardLatestResponse> GetDashboardLatest(
         GetDashboardLatestRequest request,
         ServerCallContext context)
     {
-        var result = _controlPlaneService.GetLatest();
-        return Task.FromResult(HandleResult(result));
+        var result = await _controlPlaneService.GetLatestAsync(context.CancellationToken);
+        return HandleResult(result);
     }
 
     public override async Task<DashboardHistoryResponse> GetDashboardHistory(

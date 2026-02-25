@@ -18,7 +18,7 @@ v2.2 reference architecture with a concrete implementation guide.
 
 ## Project Status
 
-- Stage: v2.2 baseline delivered (Phase 0-4). v2.3 transition roadmap in docs/ARCHITECTURE-v2.3.md.
+- Stage: v2.2 baseline delivered (Phase 0-4). v2.3 Milestones 1-4 delivered.
 - License: MIT
 - Authors: Qi Junyi, Xiao Erdong (2026)
 - Sponsor: https://github.com/sponsors/JasonEran
@@ -131,10 +131,10 @@ This project targets a product-grade release, not a demo. The following standard
 - [x] Add snapshot retention automation and S3 lifecycle policy support.
 - [x] Generate SBOMs and sign container images with cosign in CI.
 
-## v2.3 Preview (Roadmap)
+## v2.3 Delivery (Roadmap)
 
-We keep the current README focused on v2.2 implementation details. The next evolution is documented in
-`docs/ARCHITECTURE-v2.3.md`. In brief, v2.3 moves from reactive thresholds to predictive, multimodal risk allocation:
+v2.3 architecture and delivery detail are documented in `docs/ARCHITECTURE-v2.3.md` and
+`docs/ROADMAP-v2.3.md`. In brief, v2.3 moves from reactive thresholds to predictive, multimodal risk allocation:
 
 - Multimodal inputs: telemetry plus external cloud signals (status pages, incident reports, capacity advisories).
 - Lightweight time-series forecasting on agents, with semantic enrichment computed in the control plane.
@@ -194,6 +194,23 @@ Open the dashboard at http://localhost:3000.
 - Observability (OpenTelemetry): docs/Observability.md
 - v2.3 architecture roadmap: docs/ARCHITECTURE-v2.3.md
 - v2.3 delivery roadmap: docs/ROADMAP-v2.3.md
+- v2.3 Milestone 1 smoke test: docs/QA-SmokeTest-v2.3-M1.md
+- v2.3 M2 data provenance: docs/Data-Provenance-v2.3-M2.md
+- v2.3 M2 data acquisition scripts: scripts/data_acquisition/README.md
+- v2.3 M2 TSMixer baseline guide: docs/AI-TSMixer-Baseline-v2.3-M2.md
+- v2.3 M2 fusion baseline guide: docs/AI-Fusion-Model-v2.3-M2.md
+- v2.3 M2 backtesting guide: docs/AI-Backtesting-v2.3-M2.md
+- v2.3 M2 artifact versioning + reproducibility guide: docs/AI-Artifact-Versioning-v2.3-M2.md
+- v2.3 M2 model training scripts: scripts/model_training/README.md
+- v2.3 M3 heartbeat semantic payload contract: docs/PROTO-Heartbeat-Semantic-v2.3-M3.md
+- v2.3 M3 agent ONNX inference + gating: docs/Agent-ONNX-Inference-v2.3-M3.md
+- v2.3 M3 core semantic rollout + per-agent gating: docs/Core-Semantic-Rollout-v2.3-M3.md
+- v2.3 M3 canary + rollback plan: docs/QA-Canary-Rollback-v2.3-M3.md
+- v2.3 M3 canary evaluator script: scripts/qa/README.md
+- v2.3 M4 dynamic risk allocation (core): docs/Core-Dynamic-Risk-v2.3-M4.md
+- v2.3 M4 dashboard explainability: docs/Web-Explainability-v2.3-M4.md
+- v2.3 release notes: docs/Release-Notes-v2.3.md
+- v2.3 PR acceptance template: docs/PR-Template-v2.3-Acceptance.md
 
 If you want to simulate migrations, start at least two agents:
 
@@ -358,7 +375,8 @@ sidecars to issue and rotate X.509 SVIDs:
 
 - Core serves mTLS on `https://core-service:8443` (host-mapped to 5001).
 - Agent uses SPIFFE-issued certs from `/run/spiffe/certs` and calls the mTLS endpoint.
-- HTTP on `http://core-service:8080` remains for dashboard/AI traffic.
+- When `Security__Mtls__AllowHttp=true`, Core also listens on `http://core-service:8080` for
+  dashboard/AI traffic (host-mapped to 5000).
 
 Disable mTLS locally by setting:
 

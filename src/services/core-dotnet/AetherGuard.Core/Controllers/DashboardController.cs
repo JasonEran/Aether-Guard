@@ -17,9 +17,9 @@ public class DashboardController : ControllerBase
     }
 
     [HttpGet("latest")]
-    public IActionResult GetLatest()
+    public async Task<IActionResult> GetLatest()
     {
-        var result = _controlPlaneService.GetLatest();
+        var result = await _controlPlaneService.GetLatestAsync(HttpContext.RequestAborted);
         if (!result.Success)
         {
             return StatusCode(result.StatusCode);
@@ -43,7 +43,19 @@ public class DashboardController : ControllerBase
                     result.Payload.Analysis.Status,
                     result.Payload.Analysis.Confidence,
                     ClampPrediction(result.Payload.Analysis.PredictedCpu),
-                    result.Payload.Analysis.RootCause));
+                    result.Payload.Analysis.RootCause,
+                    result.Payload.Analysis.Alpha,
+                    result.Payload.Analysis.PreemptProbability,
+                    result.Payload.Analysis.DecisionScore,
+                    result.Payload.Analysis.Rationale,
+                    result.Payload.Analysis.TopSignals
+                        .Select(signal => new DashboardSignalDto(
+                            signal.Key,
+                            signal.Label,
+                            signal.Value,
+                            signal.Source,
+                            signal.Detail))
+                        .ToArray()));
 
         return Ok(response);
     }
@@ -96,7 +108,19 @@ public class DashboardController : ControllerBase
         string Status,
         double Confidence,
         double PredictedCpu,
-        string RootCause);
+        string RootCause,
+        double Alpha,
+        double PreemptProbability,
+        double DecisionScore,
+        string Rationale,
+        DashboardSignalDto[] TopSignals);
+
+    private sealed record DashboardSignalDto(
+        string Key,
+        string Label,
+        double Value,
+        string Source,
+        string Detail);
 
     private sealed record TelemetryHistoryDto(
         long Id,

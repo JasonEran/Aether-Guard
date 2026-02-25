@@ -15,6 +15,7 @@ public class MigrationOrchestrator
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly CommandService _commandService;
     private readonly AnalysisService _analysisService;
+    private readonly DynamicRiskPolicy _dynamicRiskPolicy;
     private readonly SnapshotStorageService _snapshotStorage;
     private readonly IConfiguration _configuration;
     private readonly IWebHostEnvironment _environment;
@@ -24,6 +25,7 @@ public class MigrationOrchestrator
         IServiceScopeFactory serviceScopeFactory,
         CommandService commandService,
         AnalysisService analysisService,
+        DynamicRiskPolicy dynamicRiskPolicy,
         SnapshotStorageService snapshotStorage,
         IConfiguration configuration,
         IWebHostEnvironment environment,
@@ -32,6 +34,7 @@ public class MigrationOrchestrator
         _serviceScopeFactory = serviceScopeFactory;
         _commandService = commandService;
         _analysisService = analysisService;
+        _dynamicRiskPolicy = dynamicRiskPolicy;
         _snapshotStorage = snapshotStorage;
         _configuration = configuration;
         _environment = environment;
@@ -65,11 +68,12 @@ public class MigrationOrchestrator
             return;
         }
 
-        if (await HasRecentMigrationAsync(context, sourceAgentId, cancellationToken))
-        {
-            _logger.LogInformation("Recent migration found for {SourceAgentId}. Skipping cycle.", sourceAgentId);
-            return;
-        }
+        var cooldownWindow = TimeSpan.FromMinutes(_dynamicRiskPolicy.Options.CooldownMinutes);
+        var cooldownActive = cooldownWindow > TimeSpan.Zero
+            && await HasRecentMigrationAsync(context, sourceAgentId, cooldownWindow, cancellationToken);
+        var migrationsLastHour = await CountRecentMigrationsAsync(context, TimeSpan.FromHours(1), cancellationToken);
+        var maxMigrationsPerHour = _dynamicRiskPolicy.Options.MaxMigrationsPerHour;
+        var maxRateExceeded = migrationsLastHour >= maxMigrationsPerHour;
 
         var latestTelemetry = await context.TelemetryRecords
             .AsNoTracking()
@@ -94,14 +98,39 @@ public class MigrationOrchestrator
             diskAvailable);
 
         var riskResult = await _analysisService.AnalyzeAsync(riskPayload);
-        var isCritical = string.Equals(riskResult.Status, "CRITICAL", StringComparison.OrdinalIgnoreCase)
-            || (rebalanceSignal && string.Equals(riskResult.Status, "Unavailable", StringComparison.OrdinalIgnoreCase));
+        var semantic = await GetLatestSemanticSnapshotAsync(context, cancellationToken);
+        var preemptProbability = ResolvePreemptProbability(riskResult, rebalanceSignal);
+        var riskInput = new DynamicRiskInput(
+            PreemptProbability: preemptProbability,
+            RebalanceSignal: rebalanceSignal,
+            VolatilityProbability: semantic.VolatilityProbability,
+            SentimentNegative: semantic.SentimentNegative,
+            SentimentPositive: semantic.SentimentPositive);
+        var guardrails = new RiskGuardrailState(
+            CooldownActive: cooldownActive,
+            MaxRateExceeded: maxRateExceeded,
+            RecentMigrationsLastHour: migrationsLastHour,
+            MaxMigrationsPerHour: maxMigrationsPerHour);
+        var decision = _dynamicRiskPolicy.Evaluate(riskInput, guardrails);
 
-        if (!isCritical)
+        if (!decision.ShouldMigrate)
         {
-            _logger.LogInformation("Risk check for {SourceAgentId} returned {Status}", sourceAgentId, riskResult.Status);
+            _logger.LogInformation(
+                "Risk check skipped migration for {SourceAgentId}: reason={Reason}, alpha={Alpha:F3}, score={Score:F3}, status={Status}",
+                sourceAgentId,
+                decision.Reason,
+                decision.Alpha,
+                decision.DecisionScore,
+                riskResult.Status);
             return;
         }
+
+        _logger.LogInformation(
+            "Risk decision approved migration for {SourceAgentId}: alpha={Alpha:F3}, score={Score:F3}, p_preempt={PreemptProbability:F3}",
+            sourceAgentId,
+            decision.Alpha,
+            decision.DecisionScore,
+            preemptProbability);
 
         var targetAgent = await FindIdleTargetAsync(context, sourceId, cancellationToken);
         if (targetAgent is null)
@@ -200,9 +229,15 @@ public class MigrationOrchestrator
     private async Task<bool> HasRecentMigrationAsync(
         ApplicationDbContext context,
         string sourceAgentId,
+        TimeSpan window,
         CancellationToken cancellationToken)
     {
-        var cutoff = DateTime.UtcNow.AddMinutes(-2);
+        if (window <= TimeSpan.Zero)
+        {
+            return false;
+        }
+
+        var cutoff = DateTime.UtcNow - window;
         return await context.CommandAudits
             .AsNoTracking()
             .AnyAsync(
@@ -210,6 +245,84 @@ public class MigrationOrchestrator
                     && audit.Actor == sourceAgentId
                     && audit.CreatedAt >= cutoff,
                 cancellationToken);
+    }
+
+    private async Task<int> CountRecentMigrationsAsync(
+        ApplicationDbContext context,
+        TimeSpan window,
+        CancellationToken cancellationToken)
+    {
+        if (window <= TimeSpan.Zero)
+        {
+            return 0;
+        }
+
+        var cutoff = DateTime.UtcNow - window;
+        return await context.CommandAudits
+            .AsNoTracking()
+            .Where(audit => audit.Action == "Migration Completed" && audit.CreatedAt >= cutoff)
+            .CountAsync(cancellationToken);
+    }
+
+    private async Task<SemanticSnapshot> GetLatestSemanticSnapshotAsync(
+        ApplicationDbContext context,
+        CancellationToken cancellationToken)
+    {
+        var signal = await context.ExternalSignals
+            .AsNoTracking()
+            .Where(item =>
+                item.SentimentNegative.HasValue &&
+                item.SentimentPositive.HasValue &&
+                item.VolatilityProbability.HasValue)
+            .OrderByDescending(item => item.EnrichedAt ?? item.PublishedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (signal is null)
+        {
+            return new SemanticSnapshot(0.5, 0.33, 0.33);
+        }
+
+        return new SemanticSnapshot(
+            VolatilityProbability: Clamp01(signal.VolatilityProbability ?? 0.5),
+            SentimentNegative: Clamp01(signal.SentimentNegative ?? 0.33),
+            SentimentPositive: Clamp01(signal.SentimentPositive ?? 0.33));
+    }
+
+    private static double ResolvePreemptProbability(AnalysisResult riskResult, bool rebalanceSignal)
+    {
+        var confidence = Clamp01(riskResult.Confidence);
+        var prediction = Clamp01(riskResult.Prediction / 100.0);
+        var statusCritical = string.Equals(riskResult.Status, "CRITICAL", StringComparison.OrdinalIgnoreCase);
+        var unavailable = string.Equals(riskResult.Status, "Unavailable", StringComparison.OrdinalIgnoreCase);
+
+        var baseProbability = statusCritical
+            ? Math.Max(confidence, prediction)
+            : prediction;
+        if (rebalanceSignal && unavailable)
+        {
+            baseProbability = Math.Max(baseProbability, 0.9);
+        }
+        if (rebalanceSignal && statusCritical)
+        {
+            baseProbability = Math.Max(baseProbability, 0.95);
+        }
+
+        return Clamp01(baseProbability);
+    }
+
+    private static double Clamp01(double value)
+    {
+        if (value < 0.0)
+        {
+            return 0.0;
+        }
+
+        if (value > 1.0)
+        {
+            return 1.0;
+        }
+
+        return value;
     }
 
     private async Task<Agent?> FindIdleTargetAsync(
@@ -331,6 +444,11 @@ public class MigrationOrchestrator
         var safeWorkloadId = Path.GetFileName(workloadId);
         return $"{baseUrl.TrimEnd('/')}/download/{safeWorkloadId}";
     }
+
+    private sealed record SemanticSnapshot(
+        double VolatilityProbability,
+        double SentimentNegative,
+        double SentimentPositive);
 
     private enum CommandOutcome
     {

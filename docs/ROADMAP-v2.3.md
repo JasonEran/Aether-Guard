@@ -14,6 +14,7 @@ minimize integration risk while preserving backward compatibility with the v2.2 
 ### Milestone 0: Data Foundation (Signals Ingestion)
 
 **Goal**: Introduce external cloud signals and store them alongside telemetry windows.
+**Status**: Completed (2026-02-11)
 
 - Add connectors for provider status feeds and incident streams.
 - Normalize signal schema (timestamp, region, severity, source, summary).
@@ -27,6 +28,7 @@ minimize integration risk while preserving backward compatibility with the v2.2 
 ### Milestone 1: Semantic Enrichment Service
 
 **Goal**: Extract semantic vectors from signals without impacting core latency.
+**Status**: Completed (2026-02-19)
 
 - Add NLP service for incident sentiment and volatility likelihood (FinBERT or domain BERT).
 - Add LLM summarizer for longer advisories and policy updates.
@@ -37,10 +39,12 @@ minimize integration risk while preserving backward compatibility with the v2.2 
 
 - Enrichment throughput supports expected signal volume.
 - Outputs are versioned and validated.
+- FinBERT/semantic enrichment is operational (with heuristic fallback).
 
 ### Milestone 2: Fusion and Forecasting (Offline)
 
 **Goal**: Train and evaluate models with historical replay.
+**Status**: Completed (2026-02-25)
 
 - Add TSMixer baseline for numerical telemetry (PyTorch), with export to ONNX for agent inference.
 - Fuse exogenous semantic vectors for `P(Preemption | Telemetry, Signals)`.
@@ -54,6 +58,7 @@ minimize integration risk while preserving backward compatibility with the v2.2 
 ### Milestone 3: Federated Inference (Online)
 
 **Goal**: Deliver semantic vectors to agents and run local inference.
+**Status**: Completed (2026-02-25)
 
 - Extend gRPC heartbeat payload with semantic features.
 - Deploy lightweight on-agent inference (TSMixer).
@@ -67,6 +72,7 @@ minimize integration risk while preserving backward compatibility with the v2.2 
 ### Milestone 4: Dynamic Risk Management
 
 **Goal**: Replace static thresholds with dynamic risk allocation.
+**Status**: Completed (2026-02-25)
 
 - Implement confidence score and risk allocation factor.
 - Add guardrails (max migration rate, minimum cool-down windows).

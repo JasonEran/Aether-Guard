@@ -1,5 +1,7 @@
 #pragma once
 
+#include "SemanticFeatures.hpp"
+
 #include <string>
 #include <vector>
 
@@ -40,6 +42,7 @@ struct AgentConfig {
     bool enableEbpf = false;
     bool enableNetTopology = false;
     bool enableChaos = false;
+    bool enableLocalInference = false;
     std::string nodeMode;
 };
 
@@ -68,7 +71,8 @@ public:
         const std::string& agentId,
         const std::string& state,
         const std::string& tier,
-        std::vector<AgentCommand>& outCommands);
+        std::vector<AgentCommand>& outCommands,
+        SemanticHeartbeatFeatures* outSemanticFeatures = nullptr);
     bool PollCommands(const std::string& agentId, std::vector<CommandPayload>& outCommands);
     bool SendFeedback(const std::string& agentId, const CommandFeedback& feedback);
     bool UploadSnapshot(const std::string& url, const std::string& filePath);

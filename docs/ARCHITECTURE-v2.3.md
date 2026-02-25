@@ -65,6 +65,7 @@ Telemetry alone misses off-chart events. We introduce a semantic pipeline for cl
 - **Model**: a domain-adapted transformer (BERT-class). If economic signals are used, FinBERT is a reasonable baseline
   for finance-domain text; an LLM summarizer handles longer advisories and provider policy updates.
 - **Outputs (standardized)**:
+  - `schemaVersion`: semantic vector schema version.
   - `S_v`: sentiment vector (normalized polarity + severity).
   - `P_v`: volatility probability (0-1).
   - `B_s`: supply or capacity bias (long-horizon).

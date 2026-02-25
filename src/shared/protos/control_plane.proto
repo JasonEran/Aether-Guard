@@ -62,6 +62,19 @@ message DashboardAnalysis {
   double confidence = 2;
   double predicted_cpu = 3;
   string root_cause = 4;
+  double alpha = 5;
+  double preempt_probability = 6;
+  double decision_score = 7;
+  string rationale = 8;
+  repeated DashboardSignal top_signals = 9;
+}
+
+message DashboardSignal {
+  string key = 1;
+  string label = 2;
+  double value = 3;
+  string source = 4;
+  string detail = 5;
 }
 
 message GetDashboardHistoryRequest {

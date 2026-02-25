@@ -162,6 +162,7 @@ bool NetworkClient::Register(
         outConfig->enableEbpf = config.value("enableEbpf", false);
         outConfig->enableNetTopology = config.value("enableNetTopology", false);
         outConfig->enableChaos = config.value("enableChaos", false);
+        outConfig->enableLocalInference = config.value("enableLocalInference", false);
         outConfig->nodeMode = config.value("nodeMode", "");
     }
     return !outToken.empty() && !outAgentId.empty();
@@ -172,8 +173,12 @@ bool NetworkClient::SendHeartbeat(
     const std::string& agentId,
     const std::string& state,
     const std::string& tier,
-    std::vector<AgentCommand>& outCommands) {
+    std::vector<AgentCommand>& outCommands,
+    SemanticHeartbeatFeatures* outSemanticFeatures) {
     outCommands.clear();
+    if (outSemanticFeatures != nullptr) {
+        *outSemanticFeatures = SemanticHeartbeatFeatures{};
+    }
 
     nlohmann::json payload = {
         {"agentId", agentId},
@@ -218,14 +223,30 @@ bool NetworkClient::SendHeartbeat(
 
         if (requestOk && statusOk) {
             auto json = nlohmann::json::parse(response.text, nullptr, false);
-            if (!json.is_discarded() && json.contains("commands") && json["commands"].is_array()) {
-                for (const auto& item : json["commands"]) {
-                    AgentCommand command;
-                    command.id = item.value("id", 0);
-                    command.type = item.value("type", "");
-                    if (command.id > 0 && !command.type.empty()) {
-                        outCommands.push_back(std::move(command));
+            if (!json.is_discarded()) {
+                if (json.contains("commands") && json["commands"].is_array()) {
+                    for (const auto& item : json["commands"]) {
+                        AgentCommand command;
+                        command.id = item.value("id", 0);
+                        command.type = item.value("type", item.value("action", ""));
+                        if (command.id > 0 && !command.type.empty()) {
+                            outCommands.push_back(std::move(command));
+                        }
                     }
+                }
+
+                if (outSemanticFeatures != nullptr && json.contains("semanticFeatures") && json["semanticFeatures"].is_object()) {
+                    const auto& semantic = json["semanticFeatures"];
+                    outSemanticFeatures->present = true;
+                    outSemanticFeatures->schemaVersion = semantic.value("schemaVersion", "");
+                    outSemanticFeatures->sVNegative = semantic.value("sVNegative", 0.33);
+                    outSemanticFeatures->sVNeutral = semantic.value("sVNeutral", 0.34);
+                    outSemanticFeatures->sVPositive = semantic.value("sVPositive", 0.33);
+                    outSemanticFeatures->pV = semantic.value("pV", 0.5);
+                    outSemanticFeatures->bS = semantic.value("bS", 0.5);
+                    outSemanticFeatures->source = semantic.value("source", "");
+                    outSemanticFeatures->generatedAtUnix = semantic.value("generatedAtUnix", 0LL);
+                    outSemanticFeatures->fallbackUsed = semantic.value("fallbackUsed", true);
                 }
             }
             return true;

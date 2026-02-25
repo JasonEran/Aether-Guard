@@ -13,6 +13,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<Agent> Agents => Set<Agent>();
     public DbSet<AgentCommand> AgentCommands => Set<AgentCommand>();
     public DbSet<CommandAudit> CommandAudits => Set<CommandAudit>();
+    public DbSet<ExternalSignalFeedState> ExternalSignalFeedStates => Set<ExternalSignalFeedState>();
+    public DbSet<ExternalSignal> ExternalSignals => Set<ExternalSignal>();
     public DbSet<TelemetryRecord> TelemetryRecords => Set<TelemetryRecord>();
     public DbSet<SchemaRegistryEntry> SchemaRegistryEntries => Set<SchemaRegistryEntry>();
 
@@ -86,6 +88,52 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Version).HasColumnName("version");
             entity.Property(e => e.Schema).HasColumnName("schema");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+        });
+
+        modelBuilder.Entity<ExternalSignal>(entity =>
+        {
+            entity.ToTable("external_signals");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.Source, e.ExternalId }).IsUnique();
+            entity.HasIndex(e => e.PublishedAt);
+            entity.Property(e => e.Id).HasColumnName("id").ValueGeneratedOnAdd();
+            entity.Property(e => e.Source).HasColumnName("source");
+            entity.Property(e => e.ExternalId).HasColumnName("external_id");
+            entity.Property(e => e.Title).HasColumnName("title");
+            entity.Property(e => e.Summary).HasColumnName("summary");
+            entity.Property(e => e.SummaryDigest).HasColumnName("summary_digest");
+            entity.Property(e => e.SummaryDigestTruncated).HasColumnName("summary_digest_truncated");
+            entity.Property(e => e.SummarySchemaVersion).HasColumnName("summary_schema_version");
+            entity.Property(e => e.EnrichmentSchemaVersion).HasColumnName("enrichment_schema_version");
+            entity.Property(e => e.SentimentNegative).HasColumnName("sentiment_negative");
+            entity.Property(e => e.SentimentNeutral).HasColumnName("sentiment_neutral");
+            entity.Property(e => e.SentimentPositive).HasColumnName("sentiment_positive");
+            entity.Property(e => e.VolatilityProbability).HasColumnName("volatility_probability");
+            entity.Property(e => e.SupplyBias).HasColumnName("supply_bias");
+            entity.Property(e => e.SummarizedAt).HasColumnName("summarized_at");
+            entity.Property(e => e.EnrichedAt).HasColumnName("enriched_at");
+            entity.Property(e => e.Region).HasColumnName("region");
+            entity.Property(e => e.Severity).HasColumnName("severity");
+            entity.Property(e => e.Category).HasColumnName("category");
+            entity.Property(e => e.Url).HasColumnName("url");
+            entity.Property(e => e.Tags).HasColumnName("tags");
+            entity.Property(e => e.PublishedAt).HasColumnName("published_at");
+            entity.Property(e => e.IngestedAt).HasColumnName("ingested_at");
+        });
+
+        modelBuilder.Entity<ExternalSignalFeedState>(entity =>
+        {
+            entity.ToTable("external_signal_feeds");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Name).IsUnique();
+            entity.Property(e => e.Id).HasColumnName("id").ValueGeneratedOnAdd();
+            entity.Property(e => e.Name).HasColumnName("name");
+            entity.Property(e => e.Url).HasColumnName("url");
+            entity.Property(e => e.LastFetchAt).HasColumnName("last_fetch_at");
+            entity.Property(e => e.LastSuccessAt).HasColumnName("last_success_at");
+            entity.Property(e => e.FailureCount).HasColumnName("failure_count");
+            entity.Property(e => e.LastError).HasColumnName("last_error");
+            entity.Property(e => e.LastStatusCode).HasColumnName("last_status_code");
         });
     }
 }
