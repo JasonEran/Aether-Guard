@@ -1,6 +1,37 @@
 name: Supply Chain (SBOM + Cosign + SLSA)
 
 on:
+  push:
+    branches:
+      - master
+      - release/**
+    paths:
+      - .github/workflows/supply-chain.yml
+      - .github/workflows/slsa-source-provenance.yml
+      - docker-compose.yml
+      - infrastructure/**
+      - src/db/**
+      - src/services/core-dotnet/**
+      - src/services/ai-engine/**
+      - src/services/agent-cpp/**
+      - src/shared/protos/**
+      - src/web/dashboard/**
+      - third_party/**
+  pull_request:
+    branches:
+      - master
+    paths:
+      - .github/workflows/supply-chain.yml
+      - .github/workflows/slsa-source-provenance.yml
+      - docker-compose.yml
+      - infrastructure/**
+      - src/db/**
+      - src/services/core-dotnet/**
+      - src/services/ai-engine/**
+      - src/services/agent-cpp/**
+      - src/shared/protos/**
+      - src/web/dashboard/**
+      - third_party/**
   workflow_dispatch:
 
 permissions:
@@ -56,7 +87,7 @@ jobs:
           echo "labels=" >> "$GITHUB_OUTPUT"
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./src/services/core-dotnet/AetherGuard.Core/Dockerfile
@@ -66,7 +97,7 @@ jobs:
           labels: ${{ github.actor == 'nektos/act' && steps.meta-local.outputs.labels || steps.meta.outputs.labels }}
       - name: Generate SBOM
         if: ${{ github.actor != 'nektos/act' }}
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@v0.22.2
         with:
           image: ${{ steps.image-vars.outputs.image_base }}/core-service@${{ steps.build.outputs.digest }}
           registry-username: ${{ github.actor }}
@@ -81,7 +112,7 @@ jobs:
           path: sbom-core.spdx.json
       - name: Install cosign
         if: ${{ github.actor != 'nektos/act' }}
-        uses: sigstore/cosign-installer@v3
+        uses: sigstore/cosign-installer@v4
       - name: Sign image
         if: ${{ github.actor != 'nektos/act' }}
         env:
@@ -148,7 +179,7 @@ jobs:
           echo "labels=" >> "$GITHUB_OUTPUT"
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./src/services/ai-engine
           file: ./src/services/ai-engine/Dockerfile
@@ -158,7 +189,7 @@ jobs:
           labels: ${{ github.actor == 'nektos/act' && steps.meta-local.outputs.labels || steps.meta.outputs.labels }}
       - name: Generate SBOM
         if: ${{ github.actor != 'nektos/act' }}
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@v0.22.2
         with:
           image: ${{ steps.image-vars.outputs.image_base }}/ai-service@${{ steps.build.outputs.digest }}
           registry-username: ${{ github.actor }}
@@ -173,7 +204,7 @@ jobs:
           path: sbom-ai.spdx.json
       - name: Install cosign
         if: ${{ github.actor != 'nektos/act' }}
-        uses: sigstore/cosign-installer@v3
+        uses: sigstore/cosign-installer@v4
       - name: Sign image
         if: ${{ github.actor != 'nektos/act' }}
         env:
@@ -240,7 +271,7 @@ jobs:
           echo "labels=" >> "$GITHUB_OUTPUT"
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./src/web/dashboard
           file: ./src/web/dashboard/Dockerfile
@@ -250,7 +281,7 @@ jobs:
           labels: ${{ github.actor == 'nektos/act' && steps.meta-local.outputs.labels || steps.meta.outputs.labels }}
       - name: Generate SBOM
         if: ${{ github.actor != 'nektos/act' }}
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@v0.22.2
         with:
           image: ${{ steps.image-vars.outputs.image_base }}/web-service@${{ steps.build.outputs.digest }}
           registry-username: ${{ github.actor }}
@@ -265,7 +296,7 @@ jobs:
           path: sbom-web.spdx.json
       - name: Install cosign
         if: ${{ github.actor != 'nektos/act' }}
-        uses: sigstore/cosign-installer@v3
+        uses: sigstore/cosign-installer@v4
       - name: Sign image
         if: ${{ github.actor != 'nektos/act' }}
         env:
@@ -332,7 +363,7 @@ jobs:
           echo "labels=" >> "$GITHUB_OUTPUT"
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./src/services/agent-cpp/Dockerfile
@@ -342,7 +373,7 @@ jobs:
           labels: ${{ github.actor == 'nektos/act' && steps.meta-local.outputs.labels || steps.meta.outputs.labels }}
       - name: Generate SBOM
         if: ${{ github.actor != 'nektos/act' }}
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@v0.22.2
         with:
           image: ${{ steps.image-vars.outputs.image_base }}/agent-service@${{ steps.build.outputs.digest }}
           registry-username: ${{ github.actor }}
@@ -357,7 +388,7 @@ jobs:
           path: sbom-agent.spdx.json
       - name: Install cosign
         if: ${{ github.actor != 'nektos/act' }}
-        uses: sigstore/cosign-installer@v3
+        uses: sigstore/cosign-installer@v4
       - name: Sign image
         if: ${{ github.actor != 'nektos/act' }}
         env:
