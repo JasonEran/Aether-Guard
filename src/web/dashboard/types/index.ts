@@ -1,5 +1,13 @@
 export type WorkloadTier = 'T1' | 'T2' | 'T3';
 
+export interface ExplainabilitySignal {
+  key: string;
+  label: string;
+  value: number;
+  source: string;
+  detail: string;
+}
+
 export interface Agent {
   agentId: string;
   status: string;
@@ -12,6 +20,11 @@ export interface Agent {
   rootCause?: string;
   rebalanceSignal?: boolean;
   diskAvailable?: number;
+  alpha?: number;
+  preemptProbability?: number;
+  decisionScore?: number;
+  decisionRationale?: string;
+  topSignals?: ExplainabilitySignal[];
 }
 
 export interface AuditLog {

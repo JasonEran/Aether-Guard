@@ -18,6 +18,17 @@ interface CoreLatestResponse {
     confidence: number;
     predictedCpu: number;
     rootCause: string;
+    alpha?: number;
+    preemptProbability?: number;
+    decisionScore?: number;
+    rationale?: string;
+    topSignals?: Array<{
+      key: string;
+      label: string;
+      value: number;
+      source: string;
+      detail: string;
+    }>;
   };
 }
 
@@ -100,6 +111,11 @@ export async function fetchFleetStatus(): Promise<Agent[]> {
         rootCause: analysis?.rootCause,
         rebalanceSignal: telemetry.rebalanceSignal,
         diskAvailable: telemetry.diskAvailable,
+        alpha: analysis?.alpha,
+        preemptProbability: analysis?.preemptProbability,
+        decisionScore: analysis?.decisionScore,
+        decisionRationale: analysis?.rationale,
+        topSignals: analysis?.topSignals,
       },
     ];
   } catch (error) {

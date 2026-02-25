@@ -208,6 +208,7 @@ Open the dashboard at http://localhost:3000.
 - v2.3 M3 canary + rollback plan: docs/QA-Canary-Rollback-v2.3-M3.md
 - v2.3 M3 canary evaluator script: scripts/qa/README.md
 - v2.3 M4 dynamic risk allocation (core): docs/Core-Dynamic-Risk-v2.3-M4.md
+- v2.3 M4 dashboard explainability: docs/Web-Explainability-v2.3-M4.md
 
 If you want to simulate migrations, start at least two agents:
 

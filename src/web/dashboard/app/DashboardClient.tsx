@@ -54,6 +54,33 @@ const buildMockPayload = (now: number, chaosActive: boolean) => {
       rootCause: 'Stable capacity',
       rebalanceSignal: false,
       diskAvailable: 180 * 1024 * 1024 * 1024,
+      alpha: 0.86,
+      preemptProbability: 0.18,
+      decisionScore: 0.15,
+      decisionRationale: 'Dynamic alpha remains low due to calm volatility and weak sentiment pressure.',
+      topSignals: [
+        {
+          key: 'ai_preempt_probability',
+          label: 'AI P_preempt',
+          value: 0.18,
+          source: 'ai',
+          detail: 'status=LOW, confidence=0.74, predicted_cpu=28%',
+        },
+        {
+          key: 'volatility_probability',
+          label: 'Volatility Probability',
+          value: 0.22,
+          source: 'external:aws-status',
+          detail: 'Stable provider incident cadence.',
+        },
+        {
+          key: 'sentiment_pressure',
+          label: 'Sentiment Pressure',
+          value: 0.08,
+          source: 'external:aws-status',
+          detail: 'negative=0.27, positive=0.19',
+        },
+      ],
     },
     {
       agentId: 'node-zephyr-07',
@@ -68,6 +95,59 @@ const buildMockPayload = (now: number, chaosActive: boolean) => {
       rootCause: chaosActive ? 'Rebalance signal asserted' : 'Stable capacity',
       rebalanceSignal: chaosActive,
       diskAvailable: chaosActive ? 52 * 1024 * 1024 * 1024 : 96 * 1024 * 1024 * 1024,
+      alpha: chaosActive ? 1.6 : 1.03,
+      preemptProbability: chaosActive ? 0.95 : 0.46,
+      decisionScore: chaosActive ? 1.0 : 0.47,
+      decisionRationale: chaosActive
+        ? 'Rebalance signal is active, so alpha is pinned to max risk posture.'
+        : 'Dynamic alpha rises with volatility and sentiment pressure.',
+      topSignals: chaosActive
+        ? [
+            {
+              key: 'rebalance_signal',
+              label: 'Rebalance Signal',
+              value: 1,
+              source: 'telemetry',
+              detail: 'Provider rebalance hint is active.',
+            },
+            {
+              key: 'ai_preempt_probability',
+              label: 'AI P_preempt',
+              value: 0.95,
+              source: 'ai',
+              detail: 'status=CRITICAL, confidence=0.93, predicted_cpu=92%',
+            },
+            {
+              key: 'volatility_probability',
+              label: 'Volatility Probability',
+              value: 0.84,
+              source: 'external:aws-status',
+              detail: 'Elevated incident volatility in latest signal.',
+            },
+          ]
+        : [
+            {
+              key: 'ai_preempt_probability',
+              label: 'AI P_preempt',
+              value: 0.46,
+              source: 'ai',
+              detail: 'status=LOW, confidence=0.67, predicted_cpu=48%',
+            },
+            {
+              key: 'volatility_probability',
+              label: 'Volatility Probability',
+              value: 0.51,
+              source: 'external:gcp-status',
+              detail: 'Moderate volatility from capacity advisory.',
+            },
+            {
+              key: 'sentiment_pressure',
+              label: 'Sentiment Pressure',
+              value: 0.17,
+              source: 'external:gcp-status',
+              detail: 'negative=0.41, positive=0.24',
+            },
+          ],
     },
     {
       agentId: 'node-sigma-12',
@@ -82,6 +162,33 @@ const buildMockPayload = (now: number, chaosActive: boolean) => {
       rootCause: 'Checkpoint restore failed on target node',
       rebalanceSignal: true,
       diskAvailable: 12 * 1024 * 1024 * 1024,
+      alpha: 1.6,
+      preemptProbability: 0.98,
+      decisionScore: 1.0,
+      decisionRationale: 'Rebalance signal is active, so alpha is pinned to max risk posture.',
+      topSignals: [
+        {
+          key: 'rebalance_signal',
+          label: 'Rebalance Signal',
+          value: 1,
+          source: 'telemetry',
+          detail: 'Provider rebalance hint is active.',
+        },
+        {
+          key: 'ai_preempt_probability',
+          label: 'AI P_preempt',
+          value: 0.98,
+          source: 'ai',
+          detail: 'status=CRITICAL, confidence=0.98, predicted_cpu=98%',
+        },
+        {
+          key: 'volatility_probability',
+          label: 'Volatility Probability',
+          value: 0.88,
+          source: 'external:azure-status',
+          detail: 'High volatility from spot price advisory.',
+        },
+      ],
     },
   ];
 
@@ -340,6 +447,33 @@ export default function DashboardClient({ userName, userRole }: DashboardClientP
               predictedCpu: 90,
               rootCause: 'Rebalance signal asserted',
               rebalanceSignal: true,
+              alpha: 1.6,
+              preemptProbability: 0.95,
+              decisionScore: 1.0,
+              decisionRationale: 'Rebalance signal is active, so alpha is pinned to max risk posture.',
+              topSignals: [
+                {
+                  key: 'rebalance_signal',
+                  label: 'Rebalance Signal',
+                  value: 1,
+                  source: 'telemetry',
+                  detail: 'Provider rebalance hint is active.',
+                },
+                {
+                  key: 'ai_preempt_probability',
+                  label: 'AI P_preempt',
+                  value: 0.95,
+                  source: 'ai',
+                  detail: 'status=CRITICAL, confidence=0.92, predicted_cpu=90%',
+                },
+                {
+                  key: 'volatility_probability',
+                  label: 'Volatility Probability',
+                  value: 0.82,
+                  source: 'external:aws-status',
+                  detail: 'Elevated incident volatility in latest signal.',
+                },
+              ],
             }
           : agent,
       ),
