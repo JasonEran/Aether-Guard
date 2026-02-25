@@ -68,6 +68,7 @@ builder.Services.AddScoped<TelemetryIngestionService>();
 builder.Services.AddScoped<ControlPlaneService>();
 builder.Services.AddScoped<CommandService>();
 builder.Services.AddScoped<MigrationOrchestrator>();
+builder.Services.AddSingleton<DynamicRiskPolicy>();
 builder.Services.AddScoped<DiagnosticsBundleService>();
 builder.Services.AddSingleton<SnapshotStorageService>();
 builder.Services.AddSingleton<IMessageProducer, RabbitMQProducer>();
@@ -80,6 +81,8 @@ builder.Services.Configure<AetherGuard.Core.Services.ExternalSignals.ExternalSig
     builder.Configuration.GetSection("ExternalSignals"));
 builder.Services.Configure<AgentInferenceOptions>(
     builder.Configuration.GetSection("AgentInference"));
+builder.Services.Configure<DynamicRiskOptions>(
+    builder.Configuration.GetSection("DynamicRisk"));
 builder.Services.AddHostedService<AetherGuard.Core.Services.ExternalSignals.ExternalSignalIngestionService>();
 
 var otelOptions = builder.Configuration.GetSection("OpenTelemetry").Get<OpenTelemetryOptions>()
