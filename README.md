@@ -205,6 +205,8 @@ Open the dashboard at http://localhost:3000.
 - v2.3 M3 heartbeat semantic payload contract: docs/PROTO-Heartbeat-Semantic-v2.3-M3.md
 - v2.3 M3 agent ONNX inference + gating: docs/Agent-ONNX-Inference-v2.3-M3.md
 - v2.3 M3 core semantic rollout + per-agent gating: docs/Core-Semantic-Rollout-v2.3-M3.md
+- v2.3 M3 canary + rollback plan: docs/QA-Canary-Rollback-v2.3-M3.md
+- v2.3 M3 canary evaluator script: scripts/qa/README.md
 
 If you want to simulate migrations, start at least two agents:
 
