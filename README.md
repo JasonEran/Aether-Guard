@@ -194,6 +194,7 @@ Open the dashboard at http://localhost:3000.
 - Observability (OpenTelemetry): docs/Observability.md
 - v2.3 architecture roadmap: docs/ARCHITECTURE-v2.3.md
 - v2.3 delivery roadmap: docs/ROADMAP-v2.3.md
+- v2.3 class diagrams (Mermaid): docs/diagrams/Class-Diagram-v2.3.md
 - v2.3 Milestone 1 smoke test: docs/QA-SmokeTest-v2.3-M1.md
 - v2.3 M2 data provenance: docs/Data-Provenance-v2.3-M2.md
 - v2.3 M2 data acquisition scripts: scripts/data_acquisition/README.md
