@@ -30,5 +30,17 @@ What actually happened.
 ## Logs / Screenshots
 Paste logs or screenshots that help explain the issue.
 
+## Acceptance Criteria
+- [ ] Root cause identified.
+- [ ] Fix validated in local or CI environment.
+- [ ] No regression introduced for related paths.
+
+## Validation Steps
+List exact commands or manual steps used to verify the fix.
+```bash
+# example:
+# dotnet test ...
+```
+
 ## Additional Context
 Any additional information that may help.
