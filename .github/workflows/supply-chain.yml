@@ -112,7 +112,7 @@ jobs:
           path: sbom-core.spdx.json
       - name: Install cosign
         if: ${{ github.actor != 'nektos/act' }}
-        uses: sigstore/cosign-installer@v4
+        uses: sigstore/cosign-installer@v4.0.0
       - name: Sign image
         if: ${{ github.actor != 'nektos/act' }}
         env:
@@ -204,7 +204,7 @@ jobs:
           path: sbom-ai.spdx.json
       - name: Install cosign
         if: ${{ github.actor != 'nektos/act' }}
-        uses: sigstore/cosign-installer@v4
+        uses: sigstore/cosign-installer@v4.0.0
       - name: Sign image
         if: ${{ github.actor != 'nektos/act' }}
         env:
@@ -296,7 +296,7 @@ jobs:
           path: sbom-web.spdx.json
       - name: Install cosign
         if: ${{ github.actor != 'nektos/act' }}
-        uses: sigstore/cosign-installer@v4
+        uses: sigstore/cosign-installer@v4.0.0
       - name: Sign image
         if: ${{ github.actor != 'nektos/act' }}
         env:
@@ -388,7 +388,7 @@ jobs:
           path: sbom-agent.spdx.json
       - name: Install cosign
         if: ${{ github.actor != 'nektos/act' }}
-        uses: sigstore/cosign-installer@v4
+        uses: sigstore/cosign-installer@v4.0.0
       - name: Sign image
         if: ${{ github.actor != 'nektos/act' }}
         env:
