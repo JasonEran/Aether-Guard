@@ -1,4 +1,6 @@
-![Aether-Guard Logo](./aether-guard.png)
+<p align="center">
+  <img src="./aether-guard.png" alt="Aether-Guard Logo" width="240" />
+</p>
 
 # Aether-Guard v2.3.0 (Current Release)
 
