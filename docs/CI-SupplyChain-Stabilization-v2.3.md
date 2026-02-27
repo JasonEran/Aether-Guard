@@ -25,7 +25,7 @@ Updated key actions in `supply-chain.yml`:
 
 - `docker/build-push-action` -> `v6`
 - `anchore/sbom-action` -> `v0.22.2`
-- `sigstore/cosign-installer` -> `v4`
+- `sigstore/cosign-installer` -> `v4.0.0`
 
 SLSA reusable workflows stay on latest upstream release (`v2.1.0`).
 

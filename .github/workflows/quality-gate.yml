@@ -1,0 +1,104 @@
+name: Quality Gate (Build + Test + Lint)
+
+on:
+  push:
+    branches:
+      - master
+      - release/**
+    paths:
+      - .github/workflows/quality-gate.yml
+      - src/services/core-dotnet/**
+      - src/services/agent-cpp/**
+      - src/services/ai-engine/**
+      - src/web/dashboard/**
+      - src/shared/protos/**
+      - scripts/**
+  pull_request:
+    branches:
+      - master
+    paths:
+      - .github/workflows/quality-gate.yml
+      - src/services/core-dotnet/**
+      - src/services/agent-cpp/**
+      - src/services/ai-engine/**
+      - src/web/dashboard/**
+      - src/shared/protos/**
+      - scripts/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-gate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core-dotnet:
+    name: Core (.NET) Build + Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore
+        run: dotnet restore src/services/core-dotnet/AetherGuard.Core/AetherGuard.Core.csproj
+      - name: Build
+        run: dotnet build src/services/core-dotnet/AetherGuard.Core/AetherGuard.Core.csproj -c Release --no-restore
+      - name: Test
+        run: dotnet test src/services/core-dotnet/AetherGuard.Core.Tests/AetherGuard.Core.Tests.csproj -c Release --no-build --verbosity minimal
+
+  agent-cpp:
+    name: Agent (C++) Build + Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >
+          cmake
+          -S src/services/agent-cpp
+          -B src/services/agent-cpp/build_ci_agent
+          -DAETHER_ENABLE_GRPC=OFF
+          -DAETHER_USE_LOCAL_PROTOBUF=ON
+          -DAETHER_ENABLE_ONNX_RUNTIME=OFF
+      - name: Build
+        run: >
+          cmake --build src/services/agent-cpp/build_ci_agent
+          --config Release
+          --target AetherAgent AetherAgentTests AetherAgentInferenceTests
+      - name: Test
+        run: ctest --test-dir src/services/agent-cpp/build_ci_agent -C Release --output-on-failure
+
+  web-dashboard:
+    name: Web (Next.js) Lint + Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/web/dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: src/web/dashboard/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
+
+  ai-python:
+    name: AI/Python Syntax Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate AI entrypoint syntax
+        run: python -m py_compile src/services/ai-engine/main.py
+      - name: Validate automation scripts syntax
+        run: python -m compileall scripts/model_training scripts/qa

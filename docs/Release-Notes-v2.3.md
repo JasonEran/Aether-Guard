@@ -1,7 +1,8 @@
 # Aether-Guard v2.3 Release Notes
 
-Release date: 2026-02-25  
-Release branch: `feature/v2.3`
+Release date: 2026-02-26  
+Release tag: `v2.3.0`  
+Release branch: `master`
 
 ## Release Summary
 
@@ -64,4 +65,4 @@ v2.3 upgrades Aether-Guard from static/reactive risk handling to a predictive mu
 
 ## Known Follow-ups
 
-- `#8` course/project management epic (open)
+- None blocking the v2.3 release baseline. Course/project management epic `#8` closed on 2026-02-26.

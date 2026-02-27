@@ -212,6 +212,8 @@ Open the dashboard at http://localhost:3000.
 - v2.3 M4 dashboard explainability: docs/Web-Explainability-v2.3-M4.md
 - v2.3 CI / supply-chain stabilization: docs/CI-SupplyChain-Stabilization-v2.3.md
 - v2.3 release notes: docs/Release-Notes-v2.3.md
+- CP3407 rubric evidence matrix: docs/CP3407-HD-Evidence.md
+- CP3407 requirements + estimation: docs/CP3407-Requirements-v2.3.md
 - v2.3 PR acceptance template: docs/PR-Template-v2.3-Acceptance.md
 
 If you want to simulate migrations, start at least two agents:
