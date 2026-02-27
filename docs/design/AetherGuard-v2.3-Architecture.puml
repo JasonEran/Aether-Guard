@@ -1,0 +1,51 @@
+@startuml
+title Aether-Guard v2.3 - Architecture UML
+skinparam classAttributeIconSize 0
+
+package "Agent (C++)" {
+  class AgentService {
+    +register()
+    +heartbeat()
+    +checkpoint()
+    +restore()
+  }
+}
+
+package "Core (.NET)" {
+  class CoreApi {
+    +ingestTelemetry()
+    +queueCommand()
+    +runMigrationCycle()
+    +getDashboardLatest()
+  }
+}
+
+package "AI Engine (Python)" {
+  class AiEngine {
+    +analyze()
+    +enrichSignals()
+    +enrichSignalsBatch()
+    +summarize()
+  }
+}
+
+package "Web (Next.js)" {
+  class WebDashboard {
+    +fetchFleetStatus()
+    +fetchRiskHistory()
+    +renderExplainability()
+  }
+}
+
+class PostgreSQL <<database>>
+class RabbitMQ <<queue>>
+class SnapshotStorage <<storage>>
+
+AgentService --> CoreApi : telemetry + heartbeat
+CoreApi --> AgentService : control commands
+CoreApi --> AiEngine : risk + enrichment calls
+CoreApi --> PostgreSQL : persistence
+CoreApi --> RabbitMQ : async ingestion
+CoreApi --> SnapshotStorage : snapshot artifacts
+WebDashboard --> CoreApi : dashboard APIs
+@enduml

@@ -1,0 +1,109 @@
+@startuml
+title Aether-Guard v2.3 - Database ERD
+hide methods
+hide stereotypes
+skinparam linetype ortho
+
+entity "agents" as agents {
+  *id : uuid
+  --
+  agenttoken : text <<unique>>
+  hostname : text
+  status : text
+  lastheartbeat : timestamptz
+}
+
+entity "agent_commands" as agent_commands {
+  *id : int
+  --
+  command_id : uuid
+  agent_id : uuid
+  workload_id : text
+  action : text
+  parameters : text
+  status : text
+  nonce : text
+  signature : text
+  expires_at : timestamp
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+entity "command_audits" as command_audits {
+  *id : bigint
+  --
+  command_id : uuid
+  actor : text
+  action : text
+  result : text
+  error : text
+  created_at : timestamp
+}
+
+entity "TelemetryRecords" as telemetry_records {
+  *Id : bigint
+  *Timestamp : timestamp
+  --
+  AgentId : text
+  WorkloadTier : text
+  RebalanceSignal : bool
+  DiskAvailable : bigint
+  CpuUsage : double
+  MemoryUsage : double
+  AiStatus : text
+  AiConfidence : double
+  RootCause : text
+  PredictedCpu : double
+}
+
+entity "schema_registry" as schema_registry {
+  *id : bigint
+  --
+  subject : text
+  version : int
+  schema : text
+  created_at : timestamptz
+}
+
+entity "external_signal_feeds" as external_signal_feeds {
+  *id : bigint
+  --
+  name : text <<unique>>
+  url : text
+  last_fetch_at : timestamptz
+  last_success_at : timestamptz
+  failure_count : int
+  last_error : text
+  last_status_code : int
+}
+
+entity "external_signals" as external_signals {
+  *id : bigint
+  --
+  source : text
+  external_id : text
+  title : text
+  summary : text
+  summary_digest : text
+  summary_digest_truncated : bool
+  summary_schema_version : text
+  enrichment_schema_version : text
+  sentiment_negative : double
+  sentiment_neutral : double
+  sentiment_positive : double
+  volatility_probability : double
+  supply_bias : double
+  summarized_at : timestamptz
+  enriched_at : timestamptz
+  region : text
+  severity : text
+  category : text
+  url : text
+  tags : text
+  published_at : timestamptz
+  ingested_at : timestamptz
+}
+
+agents ||--o{ agent_commands : "id = agent_id"
+agent_commands ||--o{ command_audits : "command_id"
+@enduml

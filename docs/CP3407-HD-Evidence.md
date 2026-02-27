@@ -29,7 +29,7 @@ Current evidence:
 
 Gap to secure HD+:
 
-- Add explicit user-story estimation + priority + budget/effort justification table in a dedicated planning page.
+- Implemented in `docs/CP3407-Requirements-v2.3.md` (story matrix, priority, SP estimation, sequencing).
 
 ### 2) Design
 
@@ -40,8 +40,7 @@ Current evidence:
 
 Gap to secure HD+:
 
-- Add external-tool artifacts expected by rubric (UML tool export, DB ERD export, UI prototype export links/screenshots).
-- Track external-tool share links in `docs/CP3407-Design-Artifacts.md`.
+- External-tool artifact links and exports are tracked in `docs/CP3407-Design-Artifacts.md`.
 
 ### 3) Implementation / Code
 
@@ -118,9 +117,7 @@ Gap to secure HD+:
 
 ## D. HD+ Closure Backlog (Priority Order)
 
-1. Add requirements estimation/prioritization/budget page.
-2. Add external-tool design artifacts (UML/ERD/UI prototype evidence).
-3. Add AI/Web automated tests (beyond syntax/lint/build).
-4. Add agile iteration log (demo + feedback + retrospective).
-5. Final rubric checklist with direct links for assessor one-click verification.
+1. Add AI/Web automated tests (beyond syntax/lint/build).
+2. Add agile iteration log (demo + feedback + retrospective).
+3. Final rubric checklist with direct links for assessor one-click verification.
    - `docs/CP3407-Assessor-OneClick.md`

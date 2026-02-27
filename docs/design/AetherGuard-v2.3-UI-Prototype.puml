@@ -1,0 +1,51 @@
+@startuml
+title Aether-Guard v2.3 - UI Prototype (Wireframe)
+scale 1.0
+
+salt
+{
+{+
+  <b>Aether-Guard Dashboard v2.3</b>
+}
+{/ <b>Overview</b> | Signals | Explainability | Control | History }
+
+{^"Fleet Health"
+ [Online Agents: 12] [Alerts: 2] [Risk State: Risk-off]
+}
+
+{+
+  <b>External Signals</b>
+}
+{T
+ + Source | Severity | Region | Published | Summary
+ + AWS    | High     | us-east-1 | 09:32 | Service disruption...
+ + GCP    | Medium   | us-central1 | 09:30 | Degraded network...
+}
+
+{+
+  <b>Explainability</b>
+}
+{T
+ + alpha | P_preempt | DecisionScore | Top Signals
+ + 0.72  | 0.81      | 0.77          | GPU shortage, incident trend
+}
+
+{+
+  <b>Control Panel</b>
+}
+[Run Fire Drill] [Queue Migration] [Rollback]
+"Audit Result: last action completed"
+}
+
+newpage
+salt
+{
+{+
+  <b>Login</b>
+}
+{^"Aether-Guard"}
+Username: | "admin          "
+Password: | "********       "
+[ Sign In ]
+}
+@enduml
