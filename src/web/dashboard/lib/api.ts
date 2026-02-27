@@ -55,7 +55,7 @@ interface CoreAuditRecord {
   createdAt: string;
 }
 
-const normalizeRiskScore = (value: unknown): number => {
+export const normalizeRiskScore = (value: unknown): number => {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return 0;
   }
@@ -64,7 +64,7 @@ const normalizeRiskScore = (value: unknown): number => {
   return Math.min(1, Math.max(0, normalized));
 };
 
-const normalizeTier = (value: string | undefined): Agent['tier'] => {
+export const normalizeTier = (value: string | undefined): Agent['tier'] => {
   if (value === 'T1' || value === 'T2' || value === 'T3') {
     return value;
   }
@@ -72,7 +72,7 @@ const normalizeTier = (value: string | undefined): Agent['tier'] => {
   return 'T2';
 };
 
-const toIsoTimestamp = (value: number | string): string => {
+export const toIsoTimestamp = (value: number | string): string => {
   if (typeof value === 'number') {
     return new Date(value * 1000).toISOString();
   }

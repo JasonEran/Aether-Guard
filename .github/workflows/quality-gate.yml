@@ -91,11 +91,13 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
+      - name: Test
+        run: npm test
       - name: Build
         run: npm run build
 
   ai-python:
-    name: AI/Python Syntax Validation
+    name: AI/Python Unit Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -106,3 +108,5 @@ jobs:
         run: python -m py_compile src/services/ai-engine/main.py
       - name: Validate automation scripts syntax
         run: python -m compileall scripts/model_training scripts/qa
+      - name: Run AI model unit tests
+        run: python -m unittest discover -s src/services/ai-engine/tests -p "test_*.py"

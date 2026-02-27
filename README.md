@@ -1,6 +1,6 @@
 ![Aether-Guard Logo](./aether-guard.png)
 
-# Aether-Guard v2.2 (Reference Architecture)
+# Aether-Guard v2.3 (Release Baseline)
 
 [![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=c%2B%2B&logoColor=white)](https://isocpp.org/)
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
@@ -13,12 +13,12 @@ Aether-Guard is a distributed infrastructure monitoring and migration system tha
 combines a high-performance C++ agent, a .NET Core control plane, a Python AI
 engine, and a Next.js dashboard for real-time telemetry and risk-aware recovery.
 
-This README documents the current implementation in this repo (v1.x) and the
-v2.2 reference architecture with a concrete implementation guide.
+This README documents the current implementation baseline (v2.3) and the
+supporting architecture/operations guidance for delivery and validation.
 
 ## Project Status
 
-- Stage: v2.2 baseline delivered (Phase 0-4). v2.3 Milestones 1-4 delivered.
+- Stage: v2.3 baseline delivered (Milestones 0-4 + CI hardening).
 - License: MIT
 - Authors: Qi Junyi, Xiao Erdong (2026)
 - Sponsor: https://github.com/sponsors/JasonEran
@@ -215,6 +215,7 @@ Open the dashboard at http://localhost:3000.
 - CP3407 rubric evidence matrix: docs/CP3407-HD-Evidence.md
 - CP3407 requirements + estimation: docs/CP3407-Requirements-v2.3.md
 - CP3407 design artifacts register: docs/CP3407-Design-Artifacts.md
+- CP3407 iteration log (demo/feedback/retrospective): docs/CP3407-Iteration-Log.md
 - CP3407 assessor one-click checklist: docs/CP3407-Assessor-OneClick.md
 - v2.3 PR acceptance template: docs/PR-Template-v2.3-Acceptance.md
 

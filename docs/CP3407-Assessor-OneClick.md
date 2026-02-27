@@ -38,9 +38,12 @@ Use this page as the single entry point for marking evidence.
 - Quality gate workflow:
   - `.github/workflows/quality-gate.yml`
 - Quality gate passing run:
-  - https://github.com/JasonEran/Aether-Guard/actions/runs/22476008904
+  - https://github.com/JasonEran/Aether-Guard/actions/runs/22477470113
 - Supply-chain passing run:
-  - https://github.com/JasonEran/Aether-Guard/actions/runs/22424248311
+  - https://github.com/JasonEran/Aether-Guard/actions/runs/22477723500
+- Automated tests:
+  - `src/services/ai-engine/tests/test_model.py`
+  - `src/web/dashboard/tests/api.utils.test.ts`
 - Smoke tests:
   - `docs/QA-SmokeTest-v2.3.md`
   - `docs/QA-SmokeTest-v2.3-M1.md`
@@ -58,6 +61,8 @@ Use this page as the single entry point for marking evidence.
   - `.github/ISSUE_TEMPLATE/task.md`
   - `.github/ISSUE_TEMPLATE/bug_report.md`
   - `.github/ISSUE_TEMPLATE/feature_request.md`
+- Iteration log (demo/feedback/retrospective):
+  - `docs/CP3407-Iteration-Log.md`
 
 ## 6) Tooling / Build Evidence
 

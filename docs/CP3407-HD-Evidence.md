@@ -63,7 +63,10 @@ Current evidence:
 
 Gap to secure HD+:
 
-- Add AI and Web automated test suites (not only syntax/lint/build).
+- Baseline AI/Web automated tests are now in place:
+  - `src/services/ai-engine/tests/test_model.py`
+  - `src/web/dashboard/tests/api.utils.test.ts`
+- Next uplift: add end-to-end/runtime integration coverage.
 
 ### 5) Version Control
 
@@ -92,10 +95,11 @@ Current evidence:
 
 - Epic/milestone-driven incremental delivery across M0-M4 (`docs/ROADMAP-v2.3.md` + issues).
 - Acceptance-oriented PR template (`docs/PR-Template-v2.3-Acceptance.md`).
+- Iteration evidence log with goal/demo/feedback/retrospective actions (`docs/CP3407-Iteration-Log.md`).
 
 Gap to secure HD+:
 
-- Add iteration evidence page (iteration goals, demo outcomes, feedback, retrospective actions).
+- Continue updating the iteration log for subsequent releases.
 
 ### 8) Project Technical Writing
 
@@ -111,13 +115,15 @@ Gap to secure HD+:
 ## C. Verified CI Evidence
 
 - Supply-chain success on `master` after stabilization:
-  - https://github.com/JasonEran/Aether-Guard/actions/runs/22424248311
+  - https://github.com/JasonEran/Aether-Guard/actions/runs/22477723500
+- Quality gate success on `master`:
+  - https://github.com/JasonEran/Aether-Guard/actions/runs/22477470113
 - Release published:
   - https://github.com/JasonEran/Aether-Guard/releases/tag/v2.3.0
 
 ## D. HD+ Closure Backlog (Priority Order)
 
-1. Add AI/Web automated tests (beyond syntax/lint/build).
-2. Add agile iteration log (demo + feedback + retrospective).
-3. Final rubric checklist with direct links for assessor one-click verification.
+1. Expand AI/Web test depth (integration/e2e and richer failure-path cases).
+2. Add a dedicated toolchain rationale page (why each tool/library was selected).
+3. Keep assessor one-click checklist updated per release.
    - `docs/CP3407-Assessor-OneClick.md`
