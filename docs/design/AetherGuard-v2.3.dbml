@@ -1,0 +1,138 @@
+Project AetherGuardV23 {
+  database_type: "PostgreSQL"
+  Note: '''
+  Source: src/services/core-dotnet/AetherGuard.Core/Data/ApplicationDbContext.cs
+  Use this file with dbdiagram.io or GenMyModel to generate/export ERD evidence.
+  '''
+}
+
+Table agents {
+  id uuid [not null]
+  agenttoken text [not null, unique]
+  hostname text [not null]
+  status text [not null, default: "OFFLINE"]
+  lastheartbeat timestamptz [not null]
+
+  Indexes {
+    id [pk]
+  }
+}
+
+Table agent_commands {
+  id int [not null, increment]
+  command_id uuid [not null]
+  agent_id uuid [not null]
+  workload_id text [not null]
+  action text [not null]
+  parameters text [not null, default: "{}"]
+  status text [not null, default: "PENDING"]
+  nonce text [not null]
+  signature text [not null]
+  expires_at timestamp [not null]
+  created_at timestamp [not null]
+  updated_at timestamp
+
+  Indexes {
+    id [pk]
+    command_id [name: "idx_agent_commands_command_id"]
+  }
+}
+
+Table command_audits {
+  id bigint [not null, increment]
+  command_id uuid [not null]
+  actor text [not null]
+  action text [not null]
+  result text [not null]
+  error text
+  created_at timestamp [not null]
+
+  Indexes {
+    id [pk]
+    command_id [name: "idx_command_audits_command_id"]
+  }
+}
+
+Table TelemetryRecords {
+  Id bigint [not null, increment]
+  AgentId text [not null]
+  WorkloadTier text [not null, default: "T2"]
+  RebalanceSignal bool [not null]
+  DiskAvailable bigint [not null]
+  CpuUsage double [not null]
+  MemoryUsage double [not null]
+  AiStatus text [not null]
+  AiConfidence double [not null]
+  RootCause text
+  PredictedCpu double
+  Timestamp timestamp [not null]
+
+  Indexes {
+    (Id, Timestamp) [pk]
+    AgentId [name: "idx_telemetry_agent_id"]
+  }
+}
+
+Table schema_registry {
+  id bigint [not null, increment]
+  subject text [not null]
+  version int [not null]
+  schema text [not null]
+  created_at timestamptz [not null]
+
+  Indexes {
+    id [pk]
+    (subject, version) [unique, name: "uk_schema_registry_subject_version"]
+  }
+}
+
+Table external_signal_feeds {
+  id bigint [not null, increment]
+  name text [not null]
+  url text [not null]
+  last_fetch_at timestamptz [not null]
+  last_success_at timestamptz
+  failure_count int [not null]
+  last_error text
+  last_status_code int
+
+  Indexes {
+    id [pk]
+    name [unique, name: "uk_external_signal_feeds_name"]
+  }
+}
+
+Table external_signals {
+  id bigint [not null, increment]
+  source text [not null]
+  external_id text [not null]
+  title text [not null]
+  summary text
+  summary_digest text
+  summary_digest_truncated bool
+  summary_schema_version text
+  enrichment_schema_version text
+  sentiment_negative double
+  sentiment_neutral double
+  sentiment_positive double
+  volatility_probability double
+  supply_bias double
+  summarized_at timestamptz
+  enriched_at timestamptz
+  region text
+  severity text
+  category text
+  url text
+  tags text
+  published_at timestamptz [not null]
+  ingested_at timestamptz [not null]
+
+  Indexes {
+    id [pk]
+    (source, external_id) [unique, name: "uk_external_signals_source_external_id"]
+    published_at [name: "idx_external_signals_published_at"]
+  }
+}
+
+Ref: agent_commands.agent_id > agents.id
+Ref: command_audits.command_id > agent_commands.command_id

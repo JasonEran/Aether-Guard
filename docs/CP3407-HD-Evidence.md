@@ -41,6 +41,7 @@ Current evidence:
 Gap to secure HD+:
 
 - Add external-tool artifacts expected by rubric (UML tool export, DB ERD export, UI prototype export links/screenshots).
+- Track external-tool share links in `docs/CP3407-Design-Artifacts.md`.
 
 ### 3) Implementation / Code
 
@@ -122,3 +123,4 @@ Gap to secure HD+:
 3. Add AI/Web automated tests (beyond syntax/lint/build).
 4. Add agile iteration log (demo + feedback + retrospective).
 5. Final rubric checklist with direct links for assessor one-click verification.
+   - `docs/CP3407-Assessor-OneClick.md`

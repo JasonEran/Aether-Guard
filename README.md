@@ -214,6 +214,8 @@ Open the dashboard at http://localhost:3000.
 - v2.3 release notes: docs/Release-Notes-v2.3.md
 - CP3407 rubric evidence matrix: docs/CP3407-HD-Evidence.md
 - CP3407 requirements + estimation: docs/CP3407-Requirements-v2.3.md
+- CP3407 design artifacts register: docs/CP3407-Design-Artifacts.md
+- CP3407 assessor one-click checklist: docs/CP3407-Assessor-OneClick.md
 - v2.3 PR acceptance template: docs/PR-Template-v2.3-Acceptance.md
 
 If you want to simulate migrations, start at least two agents:
