@@ -101,3 +101,11 @@ iteration objective, demo output, feedback, and corrective action.
 - **Carry-over actions (continuous improvement)**:
   - Extend automated AI/Web functional tests beyond baseline coverage.
   - Keep design artifact links and release evidence synchronized per release.
+
+
+## Feedback Evidence Index
+
+For assessor replay of feedback-to-change traceability, see:
+
+- `docs/CP3407-Stakeholder-Feedback-v2.3.md`
+

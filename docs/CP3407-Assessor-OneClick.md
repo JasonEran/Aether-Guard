@@ -10,6 +10,8 @@ Use this page as the single entry point for marking evidence.
   - `docs/CP3407-HD-Evidence.md`
 - Requirements/priority/estimation evidence:
   - `docs/CP3407-Requirements-v2.3.md`
+- Budget and schedule tracking (on-time/on-budget numeric table):
+  - `docs/CP3407-Budget-Tracking-v2.3.md`
 
 ## 2) Design Evidence
 
@@ -32,6 +34,8 @@ Use this page as the single entry point for marking evidence.
   - https://github.com/JasonEran/Aether-Guard/releases/tag/v2.3.0
 - Milestone plan and closure context:
   - `docs/ROADMAP-v2.3.md`
+- Stakeholder/client feedback evidence by iteration:
+  - `docs/CP3407-Stakeholder-Feedback-v2.3.md`
 
 ## 4) Testing Evidence
 

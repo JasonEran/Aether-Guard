@@ -30,6 +30,7 @@ Current evidence:
 HD+ uplift delivered:
 
 - Requirements matrix with priority, estimation, and sequencing is documented in `docs/CP3407-Requirements-v2.3.md`.
+- Numeric on-time/on-budget tracking table is documented in `docs/CP3407-Budget-Tracking-v2.3.md`.
 
 ### 2) Design
 
@@ -51,6 +52,10 @@ Current evidence:
 - Merged release-track PRs (#49, #50, #51).
 
 Status: strong for HD.
+
+Additional closure evidence:
+
+- Iteration stakeholder/client feedback evidence is consolidated in `docs/CP3407-Stakeholder-Feedback-v2.3.md`.
 
 ### 4) Test
 

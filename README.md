@@ -41,9 +41,9 @@ This repository includes assessor-ready evidence mapped to:
 
 | Rubric Criterion | Primary Evidence |
 | --- | --- |
-| 1) Requirements | `docs/CP3407-Requirements-v2.3.md` |
+| 1) Requirements | `docs/CP3407-Requirements-v2.3.md`, `docs/CP3407-Budget-Tracking-v2.3.md` |
 | 2) Design | `docs/CP3407-Design-Artifacts.md`, `docs/design/exports/*` |
-| 3) Implementation / Code | `docs/Release-Notes-v2.3.md`, `docs/ROADMAP-v2.3.md`, `src/services/**`, `src/web/**` |
+| 3) Implementation / Code | `docs/Release-Notes-v2.3.md`, `docs/ROADMAP-v2.3.md`, `docs/CP3407-Stakeholder-Feedback-v2.3.md`, `src/services/**`, `src/web/**` |
 | 4) Test | `docs/CP3407-Testing-v2.3.md`, `.github/workflows/quality-gate.yml` |
 | 5) Version Control | `.github/ISSUE_TEMPLATE/*`, `.github/PULL_REQUEST_TEMPLATE.md` |
 | 6) Building & Tools | `docs/CP3407-Toolchain-Rationale-v2.3.md`, `.github/workflows/supply-chain.yml` |
@@ -254,6 +254,8 @@ Open the dashboard at http://localhost:3000.
 - v2.3 release notes: docs/Release-Notes-v2.3.md
 - CP3407 rubric evidence matrix: docs/CP3407-HD-Evidence.md
 - CP3407 requirements + estimation: docs/CP3407-Requirements-v2.3.md
+- CP3407 budget and schedule tracking: docs/CP3407-Budget-Tracking-v2.3.md
+- CP3407 stakeholder feedback evidence: docs/CP3407-Stakeholder-Feedback-v2.3.md
 - CP3407 design artifacts register: docs/CP3407-Design-Artifacts.md
 - CP3407 testing strategy + evidence: docs/CP3407-Testing-v2.3.md
 - CP3407 TDD evidence chain: docs/CP3407-TDD-Evidence-v2.3.md

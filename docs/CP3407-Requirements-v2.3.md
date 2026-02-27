@@ -59,3 +59,4 @@ correct requirements, justified priorities, and realistic delivery sequencing.
 - The release track used milestone-gated scope to avoid uncontrolled expansion.
 - Each milestone closed only after acceptance evidence (tests/docs/observability) was attached.
 - CI and release criteria were treated as first-class scope (issues #46, #47, #48), not post-hoc work.
+- Detailed numeric budget/schedule table is published in `docs/CP3407-Budget-Tracking-v2.3.md`.
