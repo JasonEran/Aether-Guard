@@ -1,6 +1,6 @@
 ![Aether-Guard Logo](./aether-guard.png)
 
-# Aether-Guard v2.3 (Release Baseline)
+# Aether-Guard v2.3.0 (Current Release)
 
 [![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=c%2B%2B&logoColor=white)](https://isocpp.org/)
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
@@ -18,12 +18,52 @@ supporting architecture/operations guidance for delivery and validation.
 
 ## Project Status
 
-- Stage: v2.3 baseline delivered (Milestones 0-4 + CI hardening).
+- Stage: v2.3.0 released (Milestones 0-4 + CI hardening completed).
 - License: MIT
 - Authors: Qi Junyi, Xiao Erdong (2026)
 - Sponsor: https://github.com/sponsors/JasonEran
 
-## Product Delivery Standard (v2.2)
+## CP3407 Compliance Snapshot (2026-02-27)
+
+This repository includes assessor-ready evidence mapped to:
+
+- `CP3407_ProjectRubric.docx` (8 marking criteria)
+- `CP3407_Projects.docx` (project hard requirements)
+
+### CP3407 Projects (Hard Requirements)
+
+- [x] Software/IT development with source code (`src/services/**`, `src/web/**`)
+- [x] Modern database (PostgreSQL/TimescaleDB in `docker-compose.yml`)
+- [x] Modern GUI (Next.js dashboard in `src/web/dashboard/**`)
+- [x] Modern toolchain in active use (CI, OpenTelemetry, SBOM/Cosign/SLSA)
+
+### Rubric Evidence Index
+
+| Rubric Criterion | Primary Evidence |
+| --- | --- |
+| 1) Requirements | `docs/CP3407-Requirements-v2.3.md` |
+| 2) Design | `docs/CP3407-Design-Artifacts.md`, `docs/design/exports/*` |
+| 3) Implementation / Code | `docs/Release-Notes-v2.3.md`, `docs/ROADMAP-v2.3.md`, `src/services/**`, `src/web/**` |
+| 4) Test | `docs/CP3407-Testing-v2.3.md`, `.github/workflows/quality-gate.yml` |
+| 5) Version Control | `.github/ISSUE_TEMPLATE/*`, `.github/PULL_REQUEST_TEMPLATE.md` |
+| 6) Building & Tools | `docs/CP3407-Toolchain-Rationale-v2.3.md`, `.github/workflows/supply-chain.yml` |
+| 7) Agile Software Engineering | `docs/CP3407-Iteration-Log.md`, `docs/PR-Template-v2.3-Acceptance.md` |
+| 8) Technical Writing | This README + `docs/CP3407-Assessor-OneClick.md` |
+
+### Additional Strength Indicators
+
+- Cross-stack merge gate for .NET/C++/Python/Web in one workflow (`quality-gate.yml`).
+- Supply-chain security evidence (SBOM generation, image signing, SLSA provenance).
+- External-tool design artifacts (UML/ERD/UI) with share links and exported files.
+- One-click assessor navigation page: `docs/CP3407-Assessor-OneClick.md`.
+
+### Verifiable Public Evidence
+
+- Quality Gate run (success): https://github.com/JasonEran/Aether-Guard/actions/runs/22479358167
+- Supply Chain run (success): https://github.com/JasonEran/Aether-Guard/actions/runs/22479358253
+- Release tag: https://github.com/JasonEran/Aether-Guard/releases/tag/v2.3.0
+
+## Product Delivery Standard (v2.3)
 
 This project targets a product-grade release, not a demo. The following standards are required for delivery.
 
@@ -47,7 +87,7 @@ This project targets a product-grade release, not a demo. The following standard
 - Compatibility and evolution: API versioning, capability negotiation, deprecation policy.
 - Performance and scale: streaming uploads/downloads, capacity baselines, horizontal scaling strategy.
 
-## Current Implementation Snapshot (v1.x)
+## Current Implementation Snapshot (v2.3.0)
 
 - Agent (C++): REST/JSON telemetry; CRIU checkpointing with automatic simulation fallback; optional OpenTelemetry spans for outbound requests.
 - Core API (.NET 8): REST controllers plus gRPC services with JSON transcoding; RabbitMQ ingestion worker with W3C trace context propagation; migration orchestration; PostgreSQL storage.
@@ -61,11 +101,11 @@ This project targets a product-grade release, not a demo. The following standard
 - Schema registry: telemetry envelope and payload schemas are registered in Postgres and validated at ingest.
 - Supply chain: SBOM generation, cosign signing, and SLSA provenance in CI.
 
-### Productization Gaps (v1.x)
+### Productization Gaps (v2.3.0)
 
-- None for the v2.2 baseline in this repo. Remaining enhancements are tracked via issues/roadmap.
+- None for the v2.3.0 baseline in this repo. Remaining enhancements are tracked via issues/roadmap.
 
-## v2.2 Reference Architecture
+## Delivery Foundations (implemented in v2.2, carried into v2.3)
 
 ### 1) Communication and Protocol (Dual-Stack + Trace Context)
 
@@ -97,7 +137,7 @@ This project targets a product-grade release, not a demo. The following standard
 - Policy plugins run in Wasmtime with fuel and memory limits.
 - Runbook automation triggers scripts and attaches artifacts to alerts.
 
-## v2.2 Implementation Checklist
+## Delivery Foundations Checklist (v2.2 -> v2.3)
 
 ### Phase 0: Product Readiness
 
