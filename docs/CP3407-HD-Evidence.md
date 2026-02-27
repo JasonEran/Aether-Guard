@@ -68,6 +68,7 @@ HD+ uplift delivered:
   - `src/web/dashboard/tests/api.utils.test.ts`
 - Rubric-facing test explanation is documented in `docs/CP3407-Testing-v2.3.md`.
 - TDD commit-level evidence chain is documented in `docs/CP3407-TDD-Evidence-v2.3.md` (with explicit evidence levels A/B/C).
+- TDD ledger is machine-verifiable via `scripts/qa/verify_tdd_evidence.py` with latest report in `docs/CP3407-TDD-Verification-v2.3.md`.
 - Next uplift: add end-to-end/runtime integration coverage.
 
 ### 5) Version Control

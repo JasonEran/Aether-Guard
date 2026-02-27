@@ -1,0 +1,119 @@
+{
+  "release": "v2.3.0",
+  "updated": "2026-02-27",
+  "entries": [
+    {
+      "id": "m0-external-signal-parser",
+      "scope": "M0 external signal parsing (#21/#26)",
+      "evidence_level": "B",
+      "test_file": "src/services/core-dotnet/AetherGuard.Core.Tests/ExternalSignalParserTests.cs",
+      "implementation_file": "src/services/core-dotnet/AetherGuard.Core/Services/ExternalSignals/ExternalSignalParser.cs",
+      "test_commit": "66be642",
+      "implementation_anchor_commit": "66be642",
+      "implementation_commits": [
+        "66be642",
+        "da6c1ce"
+      ],
+      "notes": "Parser behavior and parsing rules delivered with tests in same feature commit."
+    },
+    {
+      "id": "m1-enrichment-batch",
+      "scope": "M1 enrichment batch integration (#32)",
+      "evidence_level": "B",
+      "test_file": "src/services/core-dotnet/AetherGuard.Core.Tests/ExternalSignalEnrichmentClientTests.cs",
+      "implementation_file": "src/services/core-dotnet/AetherGuard.Core/Services/ExternalSignals/ExternalSignalEnrichmentClient.cs",
+      "test_commit": "99a5864",
+      "implementation_anchor_commit": "99a5864",
+      "implementation_commits": [
+        "7cb95b3",
+        "99a5864",
+        "d77f3b2"
+      ],
+      "notes": "Batch contract and validation tests delivered with the milestone feature delta."
+    },
+    {
+      "id": "m3-agent-rollout-gating",
+      "scope": "M3 per-agent rollout gating (#41)",
+      "evidence_level": "B",
+      "test_file": "src/services/core-dotnet/AetherGuard.Core.Tests/AgentWorkflowServiceTests.cs",
+      "implementation_file": "src/services/core-dotnet/AetherGuard.Core/Services/AgentWorkflowService.cs",
+      "test_commit": "e817897",
+      "implementation_anchor_commit": "e817897",
+      "implementation_commits": [
+        "b868b01",
+        "b540180",
+        "95b4f4f",
+        "e817897"
+      ],
+      "notes": "Rollout gating behavior and tests delivered in the same feature change set."
+    },
+    {
+      "id": "m4-dynamic-risk-guardrails",
+      "scope": "M4 dynamic risk guardrails (#43/#45)",
+      "evidence_level": "B",
+      "test_file": "src/services/core-dotnet/AetherGuard.Core.Tests/DynamicRiskPolicyTests.cs",
+      "implementation_file": "src/services/core-dotnet/AetherGuard.Core/Services/DynamicRiskPolicy.cs",
+      "test_commit": "112ab1a",
+      "implementation_anchor_commit": "112ab1a",
+      "implementation_commits": [
+        "112ab1a"
+      ],
+      "notes": "Guardrail and threshold logic delivered with direct unit tests."
+    },
+    {
+      "id": "agent-criu-command-safety",
+      "scope": "Agent CRIU command safety",
+      "evidence_level": "B",
+      "test_file": "src/services/agent-cpp/tests/CriuCommandTests.cpp",
+      "implementation_file": "src/services/agent-cpp/CriuManager.cpp",
+      "test_commit": "27bc0f8",
+      "implementation_anchor_commit": "27bc0f8",
+      "implementation_commits": [
+        "27bc0f8"
+      ],
+      "notes": "Command composition and invalid-input behavior verified at delivery time."
+    },
+    {
+      "id": "agent-local-inference-gates",
+      "scope": "Agent local inference gates (#40)",
+      "evidence_level": "B",
+      "test_file": "src/services/agent-cpp/tests/InferenceEngineTests.cpp",
+      "implementation_file": "src/services/agent-cpp/InferenceEngine.cpp",
+      "test_commit": "0783022",
+      "implementation_anchor_commit": "0783022",
+      "implementation_commits": [
+        "0783022"
+      ],
+      "notes": "Rollout/fallback inference behavior verified in same feature commit."
+    },
+    {
+      "id": "ai-risk-model-hardening",
+      "scope": "AI risk model rules hardening",
+      "evidence_level": "C",
+      "test_file": "src/services/ai-engine/tests/test_model.py",
+      "implementation_file": "src/services/ai-engine/model.py",
+      "test_commit": "f8cc49c",
+      "implementation_anchor_commit": "5598031",
+      "implementation_commits": [
+        "2e7442d",
+        "5598031"
+      ],
+      "notes": "Post-implementation hardening to improve rubric-aligned automated coverage."
+    },
+    {
+      "id": "web-api-normalization-hardening",
+      "scope": "Web API normalization hardening",
+      "evidence_level": "C",
+      "test_file": "src/web/dashboard/tests/api.utils.test.ts",
+      "implementation_file": "src/web/dashboard/lib/api.ts",
+      "test_commit": "f8cc49c",
+      "implementation_anchor_commit": "ebb8b4b",
+      "implementation_commits": [
+        "babbfcb",
+        "ebb8b4b",
+        "f8cc49c"
+      ],
+      "notes": "Post-implementation hardening for parser/normalization utility behavior."
+    }
+  ]
+}

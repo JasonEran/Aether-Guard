@@ -257,6 +257,8 @@ Open the dashboard at http://localhost:3000.
 - CP3407 design artifacts register: docs/CP3407-Design-Artifacts.md
 - CP3407 testing strategy + evidence: docs/CP3407-Testing-v2.3.md
 - CP3407 TDD evidence chain: docs/CP3407-TDD-Evidence-v2.3.md
+- CP3407 TDD ledger (machine-readable): docs/CP3407-TDD-Ledger-v2.3.json
+- CP3407 TDD verification report: docs/CP3407-TDD-Verification-v2.3.md
 - CP3407 toolchain rationale: docs/CP3407-Toolchain-Rationale-v2.3.md
 - CP3407 iteration log (demo/feedback/retrospective): docs/CP3407-Iteration-Log.md
 - CP3407 assessor one-click checklist: docs/CP3407-Assessor-OneClick.md

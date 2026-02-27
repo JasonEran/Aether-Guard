@@ -20,6 +20,18 @@ Target policy from 2026-02-27 onward:
 
 ## 2) v2.3 Evidence Matrix (Auditable)
 
+Source-of-truth ledger:
+
+- `docs/CP3407-TDD-Ledger-v2.3.json`
+
+Machine verification script:
+
+- `scripts/qa/verify_tdd_evidence.py`
+
+Latest verification snapshot:
+
+- `docs/CP3407-TDD-Verification-v2.3.md`
+
 | Scope / Issue | Test Artifact | Implementation Artifact | Test Commit | Implementation Commit | Evidence Level | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | M0 external signal parsing (#21/#26) | `src/services/core-dotnet/AetherGuard.Core.Tests/ExternalSignalParserTests.cs` | `src/services/core-dotnet/AetherGuard.Core/Services/ExternalSignals/ExternalSignalParser.cs` | `66be642` | `66be642` | B | Parser behavior and parsing rules delivered with tests in same feature commit. |
@@ -35,6 +47,16 @@ Commit links can be resolved as:
 
 - `https://github.com/JasonEran/Aether-Guard/commit/<sha>`
 
+Current evidence distribution (v2.3 baseline):
+
+- Level A: 0
+- Level B: 6
+- Level C: 2
+
+Migration objective for next release:
+
+- Convert at least 3 Level B/C chains into Level A strict test-first evidence.
+
 ## 3) Validation Evidence
 
 Local replay commands used for current baseline:
@@ -44,6 +66,9 @@ dotnet test src/services/core-dotnet/AetherGuard.Core.Tests/AetherGuard.Core.Tes
 ctest --test-dir src/services/agent-cpp/build_cp3407_audit -C Release --output-on-failure
 python -m unittest discover -s src/services/ai-engine/tests -p "test_*.py"
 npm test --prefix src/web/dashboard
+python scripts/qa/verify_tdd_evidence.py \
+  --ledger docs/CP3407-TDD-Ledger-v2.3.json \
+  --output .tmp/tdd-ledger-report.md
 ```
 
 Expected: all pass on `master` for release baseline evidence.

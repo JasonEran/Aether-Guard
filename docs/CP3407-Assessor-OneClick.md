@@ -45,6 +45,8 @@ Use this page as the single entry point for marking evidence.
   - `docs/CP3407-Testing-v2.3.md`
 - TDD evidence chain (commit-level):
   - `docs/CP3407-TDD-Evidence-v2.3.md`
+- TDD ledger verification report:
+  - `docs/CP3407-TDD-Verification-v2.3.md`
 - Automated tests:
   - `src/services/ai-engine/tests/test_model.py`
   - `src/web/dashboard/tests/api.utils.test.ts`

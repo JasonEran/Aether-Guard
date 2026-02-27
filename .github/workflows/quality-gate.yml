@@ -12,6 +12,12 @@ on:
       - src/services/ai-engine/**
       - src/web/dashboard/**
       - src/shared/protos/**
+      - docs/CP3407-Testing-v2.3.md
+      - docs/CP3407-TDD-Evidence-v2.3.md
+      - docs/CP3407-TDD-Ledger-v2.3.json
+      - docs/CP3407-TDD-Verification-v2.3.md
+      - .github/PULL_REQUEST_TEMPLATE.md
+      - docs/PR-Template-v2.3-Acceptance.md
       - scripts/**
   pull_request:
     branches:
@@ -23,6 +29,12 @@ on:
       - src/services/ai-engine/**
       - src/web/dashboard/**
       - src/shared/protos/**
+      - docs/CP3407-Testing-v2.3.md
+      - docs/CP3407-TDD-Evidence-v2.3.md
+      - docs/CP3407-TDD-Ledger-v2.3.json
+      - docs/CP3407-TDD-Verification-v2.3.md
+      - .github/PULL_REQUEST_TEMPLATE.md
+      - docs/PR-Template-v2.3-Acceptance.md
       - scripts/**
   workflow_dispatch:
 
@@ -110,3 +122,5 @@ jobs:
         run: python -m compileall scripts/model_training scripts/qa
       - name: Run AI model unit tests
         run: python -m unittest discover -s src/services/ai-engine/tests -p "test_*.py"
+      - name: Verify TDD evidence ledger
+        run: python scripts/qa/verify_tdd_evidence.py --ledger docs/CP3407-TDD-Ledger-v2.3.json --output .tmp/tdd-ledger-report.md
