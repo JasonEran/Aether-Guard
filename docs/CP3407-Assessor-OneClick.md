@@ -41,6 +41,8 @@ Use this page as the single entry point for marking evidence.
   - https://github.com/JasonEran/Aether-Guard/actions/runs/22477470113
 - Supply-chain passing run:
   - https://github.com/JasonEran/Aether-Guard/actions/runs/22477723500
+- Rubric-facing testing strategy:
+  - `docs/CP3407-Testing-v2.3.md`
 - Automated tests:
   - `src/services/ai-engine/tests/test_model.py`
   - `src/web/dashboard/tests/api.utils.test.ts`
@@ -71,6 +73,8 @@ Use this page as the single entry point for marking evidence.
 - Supply-chain/SLSA:
   - `.github/workflows/supply-chain.yml`
   - `.github/workflows/slsa-source-provenance.yml`
+- Toolchain rationale:
+  - `docs/CP3407-Toolchain-Rationale-v2.3.md`
 - Tooling and quickstart:
   - `README.md`
   - `docs/Quickstart.md`

@@ -7,7 +7,7 @@ This page maps the repository evidence to:
 - `CP3407_ProjectRubric.docx`
 - `CP3407_Projects.docx`
 
-Goal: demonstrate HD-level readiness and identify remaining gaps to exceed HD.
+Goal: demonstrate HD-level readiness and identify uplift items to exceed HD.
 
 ## A. CP3407 Projects Compliance (Hard Requirements)
 
@@ -27,9 +27,9 @@ Current evidence:
 - v2.3 milestones and scope are explicitly defined with exit criteria (`docs/ROADMAP-v2.3.md`).
 - Work is decomposed into epics/issues with completion status (GitHub issues #9-#48 all closed).
 
-Gap to secure HD+:
+HD+ uplift delivered:
 
-- Implemented in `docs/CP3407-Requirements-v2.3.md` (story matrix, priority, SP estimation, sequencing).
+- Requirements matrix with priority, estimation, and sequencing is documented in `docs/CP3407-Requirements-v2.3.md`.
 
 ### 2) Design
 
@@ -38,9 +38,9 @@ Current evidence:
 - Architecture rationale and end-to-end flow (`docs/ARCHITECTURE-v2.3.md`).
 - UML-style class diagrams for Core/Agent/AI/Web (`docs/diagrams/Class-Diagram-v2.3.md`).
 
-Gap to secure HD+:
+HD+ uplift delivered:
 
-- External-tool artifact links and exports are tracked in `docs/CP3407-Design-Artifacts.md`.
+- External-tool artifact links, exports, and design rationale are tracked in `docs/CP3407-Design-Artifacts.md`.
 
 ### 3) Implementation / Code
 
@@ -61,11 +61,12 @@ Current evidence:
 - Smoke/canary checklists (`docs/QA-SmokeTest-v2.3.md`, `docs/QA-SmokeTest-v2.3-M1.md`, `docs/QA-Canary-Rollback-v2.3-M3.md`).
 - New quality gate workflow (`.github/workflows/quality-gate.yml`) for build/test/lint automation.
 
-Gap to secure HD+:
+HD+ uplift delivered:
 
-- Baseline AI/Web automated tests are now in place:
+- Baseline AI/Web automated tests are in place:
   - `src/services/ai-engine/tests/test_model.py`
   - `src/web/dashboard/tests/api.utils.test.ts`
+- Rubric-facing test explanation is documented in `docs/CP3407-Testing-v2.3.md`.
 - Next uplift: add end-to-end/runtime integration coverage.
 
 ### 5) Version Control
@@ -85,9 +86,9 @@ Current evidence:
 - CI quality gate + supply-chain workflows (`.github/workflows/quality-gate.yml`, `.github/workflows/supply-chain.yml`).
 - SBOM/signing/provenance integration (supply-chain workflow + release documentation).
 
-Gap to secure HD+:
+HD+ uplift delivered:
 
-- Add a single "toolchain rationale" page explicitly explaining why each tool was chosen and how it was used.
+- Toolchain usage rationale is documented in `docs/CP3407-Toolchain-Rationale-v2.3.md`.
 
 ### 7) Agile Software Engineering
 
@@ -97,9 +98,9 @@ Current evidence:
 - Acceptance-oriented PR template (`docs/PR-Template-v2.3-Acceptance.md`).
 - Iteration evidence log with goal/demo/feedback/retrospective actions (`docs/CP3407-Iteration-Log.md`).
 
-Gap to secure HD+:
+HD+ uplift in place:
 
-- Continue updating the iteration log for subsequent releases.
+- Iteration log format is established and should continue for future releases (`docs/CP3407-Iteration-Log.md`).
 
 ### 8) Project Technical Writing
 
@@ -108,9 +109,9 @@ Current evidence:
 - Extensive operational/docs coverage (Quickstart, FAQ, Troubleshooting, runbooks, release notes).
 - v2.3 architecture and milestone documents are cross-linked from README.
 
-Gap to secure HD+:
+HD+ uplift in place:
 
-- Keep release/process docs fully synchronized with latest tag/run evidence and grading artifacts.
+- Assessor-facing entry points are centralized and cross-linked (`docs/CP3407-Assessor-OneClick.md`, `README.md`).
 
 ## C. Verified CI Evidence
 
@@ -124,6 +125,6 @@ Gap to secure HD+:
 ## D. HD+ Closure Backlog (Priority Order)
 
 1. Expand AI/Web test depth (integration/e2e and richer failure-path cases).
-2. Add a dedicated toolchain rationale page (why each tool/library was selected).
-3. Keep assessor one-click checklist updated per release.
+2. Keep assessor one-click checklist updated per release.
+3. Maintain toolchain/testing pages as versioned release artifacts.
    - `docs/CP3407-Assessor-OneClick.md`

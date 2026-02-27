@@ -215,6 +215,8 @@ Open the dashboard at http://localhost:3000.
 - CP3407 rubric evidence matrix: docs/CP3407-HD-Evidence.md
 - CP3407 requirements + estimation: docs/CP3407-Requirements-v2.3.md
 - CP3407 design artifacts register: docs/CP3407-Design-Artifacts.md
+- CP3407 testing strategy + evidence: docs/CP3407-Testing-v2.3.md
+- CP3407 toolchain rationale: docs/CP3407-Toolchain-Rationale-v2.3.md
 - CP3407 iteration log (demo/feedback/retrospective): docs/CP3407-Iteration-Log.md
 - CP3407 assessor one-click checklist: docs/CP3407-Assessor-OneClick.md
 - v2.3 PR acceptance template: docs/PR-Template-v2.3-Acceptance.md
