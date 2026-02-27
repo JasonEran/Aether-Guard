@@ -82,8 +82,8 @@ iteration objective, demo output, feedback, and corrective action.
 
 - **Goal**: ensure stable, auditable release workflows.
 - **Demo evidence**:
-  - Supply-chain success: https://github.com/JasonEran/Aether-Guard/actions/runs/22477723500
-  - Quality-gate success: https://github.com/JasonEran/Aether-Guard/actions/runs/22477470113
+  - Supply-chain success: https://github.com/JasonEran/Aether-Guard/actions/runs/22479358253
+  - Quality-gate success: https://github.com/JasonEran/Aether-Guard/actions/runs/22479358167
   - Release tag: https://github.com/JasonEran/Aether-Guard/releases/tag/v2.3.0
 - **Feedback captured**:
   - Action version pinning and quality gate are required for reliable marking/release.

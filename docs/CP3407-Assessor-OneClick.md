@@ -38,9 +38,9 @@ Use this page as the single entry point for marking evidence.
 - Quality gate workflow:
   - `.github/workflows/quality-gate.yml`
 - Quality gate passing run:
-  - https://github.com/JasonEran/Aether-Guard/actions/runs/22477470113
+  - https://github.com/JasonEran/Aether-Guard/actions/runs/22479358167
 - Supply-chain passing run:
-  - https://github.com/JasonEran/Aether-Guard/actions/runs/22477723500
+  - https://github.com/JasonEran/Aether-Guard/actions/runs/22479358253
 - Rubric-facing testing strategy:
   - `docs/CP3407-Testing-v2.3.md`
 - Automated tests:

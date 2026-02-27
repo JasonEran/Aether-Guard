@@ -116,9 +116,9 @@ HD+ uplift in place:
 ## C. Verified CI Evidence
 
 - Supply-chain success on `master` after stabilization:
-  - https://github.com/JasonEran/Aether-Guard/actions/runs/22477723500
+  - https://github.com/JasonEran/Aether-Guard/actions/runs/22479358253
 - Quality gate success on `master`:
-  - https://github.com/JasonEran/Aether-Guard/actions/runs/22477470113
+  - https://github.com/JasonEran/Aether-Guard/actions/runs/22479358167
 - Release published:
   - https://github.com/JasonEran/Aether-Guard/releases/tag/v2.3.0
 
