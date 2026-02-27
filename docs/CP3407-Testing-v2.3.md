@@ -49,3 +49,16 @@ This creates a single merge gate that aligns implementation with test evidence.
 - For assessor replay, use:
   - smoke + canary documents above
   - latest passing quality-gate and supply-chain runs
+
+
+## 5) TDD Evidence Chain
+
+- TDD evidence ledger (commit-level traceability):
+  - `docs/CP3407-TDD-Evidence-v2.3.md`
+- Evidence levels are explicitly classified as:
+  - `A` strict test-first
+  - `B` co-committed test + implementation
+  - `C` post-implementation backfill
+- Policy from 2026-02-27 onward:
+  - New feature work defaults to level `A`; `B/C` requires explicit PR justification.
+

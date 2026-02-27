@@ -43,6 +43,8 @@ Use this page as the single entry point for marking evidence.
   - https://github.com/JasonEran/Aether-Guard/actions/runs/22479358253
 - Rubric-facing testing strategy:
   - `docs/CP3407-Testing-v2.3.md`
+- TDD evidence chain (commit-level):
+  - `docs/CP3407-TDD-Evidence-v2.3.md`
 - Automated tests:
   - `src/services/ai-engine/tests/test_model.py`
   - `src/web/dashboard/tests/api.utils.test.ts`

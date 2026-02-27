@@ -49,6 +49,28 @@ Summary:
 - [ ] No breaking API changes without compatibility shim
 - [ ] Security checks passed (auth/mTLS/supply-chain impact reviewed)
 
+
+### TDD Evidence (Required)
+
+- [ ] Evidence level recorded (`A strict test-first` / `B co-committed` / `C backfill`)
+- [ ] Red test commit SHA captured
+- [ ] Green implementation commit SHA captured
+- [ ] Refactor commit SHA captured (or explicitly N/A)
+- [ ] Test files + implementation files listed
+- [ ] If level is `B` or `C`, justification + follow-up issue linked
+
+Paste TDD evidence:
+
+```text
+Evidence level:
+Red commit:
+Green commit:
+Refactor commit:
+Test files:
+Implementation files:
+Justification / follow-up:
+```
+
 ## Validation Commands
 
 - [ ] `dotnet build src/services/core-dotnet/AetherGuard.Core/AetherGuard.Core.csproj -c Release`

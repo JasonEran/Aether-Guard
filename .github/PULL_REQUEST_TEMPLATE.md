@@ -15,6 +15,16 @@ Closes #<issue-id>
 # paste exact validation commands and key outcomes
 ```
 
+
+## TDD Evidence (Required)
+- Evidence level: `A (strict test-first)` / `B (co-committed)` / `C (backfill)`
+- Red test commit SHA:
+- Green implementation commit SHA:
+- Refactor commit SHA (optional):
+- Test files:
+- Implementation files:
+- If level is `B` or `C`, explain why strict test-first was not used and link follow-up issue:
+
 ## Rollback Notes
 Describe rollback plan or why rollback is low risk.
 

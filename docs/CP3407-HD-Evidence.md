@@ -67,6 +67,7 @@ HD+ uplift delivered:
   - `src/services/ai-engine/tests/test_model.py`
   - `src/web/dashboard/tests/api.utils.test.ts`
 - Rubric-facing test explanation is documented in `docs/CP3407-Testing-v2.3.md`.
+- TDD commit-level evidence chain is documented in `docs/CP3407-TDD-Evidence-v2.3.md` (with explicit evidence levels A/B/C).
 - Next uplift: add end-to-end/runtime integration coverage.
 
 ### 5) Version Control
@@ -124,7 +125,8 @@ HD+ uplift in place:
 
 ## D. HD+ Closure Backlog (Priority Order)
 
-1. Expand AI/Web test depth (integration/e2e and richer failure-path cases).
-2. Keep assessor one-click checklist updated per release.
-3. Maintain toolchain/testing pages as versioned release artifacts.
+1. Increase strict test-first (Level A) ratio for new features; keep reducing Level B/C exceptions.
+2. Expand AI/Web test depth (integration/e2e and richer failure-path cases).
+3. Keep assessor one-click checklist updated per release.
    - `docs/CP3407-Assessor-OneClick.md`
+4. Maintain toolchain/testing/TDD pages as versioned release artifacts.
