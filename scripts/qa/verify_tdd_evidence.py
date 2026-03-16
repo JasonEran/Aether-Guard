@@ -79,25 +79,37 @@ def verify_entry(entry: dict[str, Any]) -> EntryResult:
     checks: list[str] = []
     ok = True
 
-    if not commit_exists(test_commit):
-        ok = False
-        checks.append(f"missing test commit {test_commit}")
-    if not commit_exists(impl_commit):
-        ok = False
-        checks.append(f"missing implementation commit {impl_commit}")
+    test_exists = commit_exists(test_commit)
+    impl_exists = commit_exists(impl_commit)
 
-    test_dt = commit_date(test_commit)
-    impl_dt = commit_date(impl_commit)
+    if not test_exists:
+        ok = False
+        checks.append(
+            f"missing test commit {test_commit} "
+            "(possible shallow checkout; use actions/checkout fetch-depth: 0)"
+        )
+    if not impl_exists:
+        ok = False
+        checks.append(
+            f"missing implementation commit {impl_commit} "
+            "(possible shallow checkout; use actions/checkout fetch-depth: 0)"
+        )
 
-    if not commit_touches_path(test_commit, test_file):
+    test_dt: datetime | None = commit_date(test_commit) if test_exists else None
+    impl_dt: datetime | None = commit_date(impl_commit) if impl_exists else None
+
+    if test_exists and not commit_touches_path(test_commit, test_file):
         ok = False
         checks.append(f"test commit {test_commit} does not touch {test_file}")
-    if not commit_touches_path(impl_commit, impl_file):
+    if impl_exists and not commit_touches_path(impl_commit, impl_file):
         ok = False
         checks.append(f"implementation commit {impl_commit} does not touch {impl_file}")
 
     if level == "A":
-        if not (test_dt < impl_dt):
+        if test_dt is None or impl_dt is None:
+            ok = False
+            checks.append("level A date ordering cannot be verified because one or more commits are missing")
+        elif not (test_dt < impl_dt):
             ok = False
             checks.append("level A requires test commit date < implementation commit date")
     elif level == "B":
@@ -105,7 +117,10 @@ def verify_entry(entry: dict[str, Any]) -> EntryResult:
             ok = False
             checks.append("level B requires co-committed evidence (same commit SHA)")
     elif level == "C":
-        if not (test_dt > impl_dt):
+        if test_dt is None or impl_dt is None:
+            ok = False
+            checks.append("level C date ordering cannot be verified because one or more commits are missing")
+        elif not (test_dt > impl_dt):
             ok = False
             checks.append("level C requires test commit date > implementation anchor commit date")
     else:
@@ -121,9 +136,9 @@ def verify_entry(entry: dict[str, Any]) -> EntryResult:
         level=level,
         status="PASS" if ok else "FAIL",
         test_commit=test_commit,
-        test_date=test_dt.date().isoformat(),
+        test_date=test_dt.date().isoformat() if test_dt else "n/a",
         implementation_commit=impl_commit,
-        implementation_date=impl_dt.date().isoformat(),
+        implementation_date=impl_dt.date().isoformat() if impl_dt else "n/a",
         checks=checks,
     )
 
