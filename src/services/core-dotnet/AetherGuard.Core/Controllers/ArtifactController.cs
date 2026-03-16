@@ -22,8 +22,10 @@ public class ArtifactController : ControllerBase
     {
         _logger = logger;
         _snapshotStorage = snapshotStorage;
-        _artifactApiKey = configuration["Security:ArtifactApiKey"]
-            ?? configuration["Security:CommandApiKey"];
+        var artifactApiKey = configuration["Security:ArtifactApiKey"];
+        _artifactApiKey = string.IsNullOrWhiteSpace(artifactApiKey)
+            ? configuration["Security:CommandApiKey"]
+            : artifactApiKey;
     }
 
     [HttpPost("upload/{workloadId}")]

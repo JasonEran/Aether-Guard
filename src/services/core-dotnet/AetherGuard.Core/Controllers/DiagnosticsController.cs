@@ -20,8 +20,10 @@ public sealed class DiagnosticsController : ControllerBase
     {
         _bundleService = bundleService;
         _logger = logger;
-        _diagnosticsApiKey = configuration["Security:DiagnosticsApiKey"]
-            ?? configuration["Security:CommandApiKey"];
+        var diagnosticsApiKey = configuration["Security:DiagnosticsApiKey"];
+        _diagnosticsApiKey = string.IsNullOrWhiteSpace(diagnosticsApiKey)
+            ? configuration["Security:CommandApiKey"]
+            : diagnosticsApiKey;
     }
 
     [HttpGet("bundle")]

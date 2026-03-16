@@ -21,8 +21,10 @@ public class IngestionController : ControllerBase
     {
         _logger = logger;
         _ingestionService = ingestionService;
-        _telemetryApiKey = configuration["Security:TelemetryApiKey"]
-            ?? configuration["Security:CommandApiKey"];
+        var telemetryApiKey = configuration["Security:TelemetryApiKey"];
+        _telemetryApiKey = string.IsNullOrWhiteSpace(telemetryApiKey)
+            ? configuration["Security:CommandApiKey"]
+            : telemetryApiKey;
     }
 
     // POST: api/v1/ingestion
