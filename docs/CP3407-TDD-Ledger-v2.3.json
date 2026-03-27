@@ -16,6 +16,19 @@
       "notes": "Strict test-first flow: failing route proxy fetch-resilience test committed before helper implementation and route refactor."
     },
     {
+      "id": "core-agent-registration-case-insensitive",
+      "scope": "Core agent registration case-insensitive hostname matching",
+      "evidence_level": "A",
+      "test_file": "src/services/core-dotnet/AetherGuard.Core.Tests/AgentWorkflowServiceTests.cs",
+      "implementation_file": "src/services/core-dotnet/AetherGuard.Core/Services/AgentWorkflowService.cs",
+      "test_commit": "824d308",
+      "implementation_anchor_commit": "cb69c45",
+      "implementation_commits": [
+        "cb69c45"
+      ],
+      "notes": "Strict test-first flow: duplicate registration with case-variant hostname was captured in a failing test before the lookup logic was normalized."
+    },
+    {
       "id": "m0-external-signal-parser",
       "scope": "M0 external signal parsing (#21/#26)",
       "evidence_level": "B",

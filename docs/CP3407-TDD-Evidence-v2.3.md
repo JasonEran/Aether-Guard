@@ -35,6 +35,7 @@ Latest verification snapshot:
 | Scope / Issue | Test Artifact | Implementation Artifact | Test Commit | Implementation Commit | Evidence Level | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | Web dashboard route proxy fetch resilience | `src/web/dashboard/tests/dashboard.route-utils.test.ts` | `src/web/dashboard/app/api/dashboard/route-utils.ts` | `2bc6b99` | `0a6059e` | A | Strict test-first flow: failing test for upstream fetch failure committed before helper implementation and route refactor. |
+| Core agent registration case-insensitive hostname matching | `src/services/core-dotnet/AetherGuard.Core.Tests/AgentWorkflowServiceTests.cs` | `src/services/core-dotnet/AetherGuard.Core/Services/AgentWorkflowService.cs` | `824d308` | `cb69c45` | A | Strict test-first flow: failing duplicate-registration test committed before case-insensitive lookup normalization. |
 | M0 external signal parsing (#21/#26) | `src/services/core-dotnet/AetherGuard.Core.Tests/ExternalSignalParserTests.cs` | `src/services/core-dotnet/AetherGuard.Core/Services/ExternalSignals/ExternalSignalParser.cs` | `66be642` | `66be642` | B | Parser behavior and parsing rules delivered with tests in same feature commit. |
 | M1 enrichment batch integration (#32) | `src/services/core-dotnet/AetherGuard.Core.Tests/ExternalSignalEnrichmentClientTests.cs` | `src/services/core-dotnet/AetherGuard.Core/Services/ExternalSignals/ExternalSignalEnrichmentClient.cs` | `99a5864` | `99a5864` (feature delta) | B | Existing client introduced earlier; batch contract + validation tests delivered with the milestone change. |
 | M3 per-agent rollout gating (#41) | `src/services/core-dotnet/AetherGuard.Core.Tests/AgentWorkflowServiceTests.cs` | `src/services/core-dotnet/AetherGuard.Core/Services/AgentWorkflowService.cs` | `e817897` | `e817897` (feature delta) | B | Rollout gating behavior and tests delivered in the same change set. |
@@ -50,13 +51,13 @@ Commit links can be resolved as:
 
 Current evidence distribution (v2.3 baseline):
 
-- Level A: 1
+- Level A: 2
 - Level B: 6
 - Level C: 2
 
 Migration objective for next release:
 
-- Convert at least 2 additional Level B/C chains into Level A strict test-first evidence.
+- Convert at least 1 additional Level B/C chain into Level A strict test-first evidence.
 
 ## 3) Validation Evidence
 
@@ -79,7 +80,9 @@ Expected: all pass on `master` for release baseline evidence.
 - PR template now requires explicit TDD evidence fields (commit IDs + evidence level).
 - v2.3 acceptance template now includes mandatory TDD evidence and exception notes.
 - Assessor checklist and testing strategy pages now link this TDD chain page.
-- Added one strict test-first (`Level A`) chain for dashboard route proxy resilience using separate red/green commits.
+- Added two strict test-first (`Level A`) chains:
+  - dashboard route proxy resilience
+  - core agent registration case-insensitive hostname matching
 
 ## 5) Forward Enforcement (for next release)
 

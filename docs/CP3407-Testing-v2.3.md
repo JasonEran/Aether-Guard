@@ -91,8 +91,10 @@ Expected baseline:
   - `docs/CP3407-TDD-Evidence-v2.3.md`
 - Latest machine-verification report:
   - `docs/CP3407-TDD-Verification-v2.3.md`
-- Current baseline includes one machine-verified `Level A` strict test-first chain
-  (`web-dashboard-route-proxy-resilience`) plus existing `B/C` entries under migration.
+- Current baseline includes two machine-verified `Level A` strict test-first chains:
+  - `web-dashboard-route-proxy-resilience`
+  - `core-agent-registration-case-insensitive`
+  plus existing `B/C` entries under migration.
 - Evidence levels are explicitly classified as:
   - `A` strict test-first
   - `B` co-committed test + implementation

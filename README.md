@@ -55,7 +55,7 @@ This repository includes assessor-ready evidence mapped to:
 ### Additional Strength Indicators
 
 - Cross-stack merge gate for .NET/C++/Python/Web in one workflow (`quality-gate.yml`).
-- Machine-verified TDD ledger now includes a strict test-first (`Level A`) chain for dashboard route proxy resilience.
+- Machine-verified TDD ledger now includes two strict test-first (`Level A`) chains across dashboard and core-service logic.
 - Requirements-to-test traceability matrix plus dashboard route/data-flow tests for assessor replay.
 - Supply-chain security evidence (SBOM generation, image signing, SLSA provenance).
 - External-tool design artifacts (UML/ERD/UI) with share links and exported files.
