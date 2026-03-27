@@ -57,6 +57,37 @@ public class AgentWorkflowServiceTests
         Assert.True(result.Payload!.Config.EnableLocalInference);
     }
 
+    [Fact]
+    public async Task RegisterAsync_TreatsHostnamesCaseInsensitively_WhenAgentAlreadyExists()
+    {
+        await using var db = CreateDbContext();
+        var service = CreateService(
+            db,
+            new AgentInferenceOptions
+            {
+                EnableLocalInferenceRollout = false,
+                RolloutPercentage = 0
+            });
+
+        var first = await service.RegisterAsync(new RegisterRequest
+        {
+            Hostname = "Agent-Case"
+        }, CancellationToken.None);
+
+        var second = await service.RegisterAsync(new RegisterRequest
+        {
+            Hostname = " agent-case "
+        }, CancellationToken.None);
+
+        Assert.True(first.Success);
+        Assert.True(second.Success);
+        Assert.NotNull(first.Payload);
+        Assert.NotNull(second.Payload);
+        Assert.Equal(first.Payload!.AgentId, second.Payload!.AgentId);
+        Assert.Equal(first.Payload.Token, second.Payload.Token);
+        Assert.Equal(1, await db.Agents.CountAsync());
+    }
+
     private static AgentWorkflowService CreateService(
         ApplicationDbContext db,
         AgentInferenceOptions options)
