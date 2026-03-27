@@ -46,7 +46,7 @@ This repository includes assessor-ready evidence mapped to:
 | 1) Requirements | `docs/CP3407-Requirements-v2.3.md`, `docs/CP3407-Budget-Tracking-v2.3.md` |
 | 2) Design | `docs/CP3407-Design-Artifacts.md`, `docs/design/exports/*` |
 | 3) Implementation / Code | `docs/Release-Notes-v2.3.md`, `docs/ROADMAP-v2.3.md`, `docs/CP3407-Stakeholder-Feedback-v2.3.md`, `src/services/**`, `src/web/**` |
-| 4) Test | `docs/CP3407-Testing-v2.3.md`, `.github/workflows/quality-gate.yml` |
+| 4) Test | `docs/CP3407-Testing-v2.3.md`, `.github/workflows/quality-gate.yml`, `src/web/dashboard/tests/dashboard.routes.test.ts` |
 | 5) Version Control | `.github/ISSUE_TEMPLATE/*`, `.github/PULL_REQUEST_TEMPLATE.md` |
 | 6) Building & Tools | `docs/CP3407-Toolchain-Rationale-v2.3.md`, `.github/workflows/supply-chain.yml` |
 | 7) Agile Software Engineering | `docs/CP3407-Iteration-Log.md`, `docs/PR-Template-v2.3-Acceptance.md` |
@@ -55,6 +55,7 @@ This repository includes assessor-ready evidence mapped to:
 ### Additional Strength Indicators
 
 - Cross-stack merge gate for .NET/C++/Python/Web in one workflow (`quality-gate.yml`).
+- Requirements-to-test traceability matrix plus dashboard route/data-flow tests for assessor replay.
 - Supply-chain security evidence (SBOM generation, image signing, SLSA provenance).
 - External-tool design artifacts (UML/ERD/UI) with share links and exported files.
 - One-click assessor navigation page: `docs/CP3407-Assessor-OneClick.md`.

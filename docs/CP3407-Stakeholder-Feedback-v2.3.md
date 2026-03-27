@@ -34,6 +34,65 @@ Deployment and demonstration evidence used in milestone reviews:
 - Release artifact:
   - https://github.com/JasonEran/Aether-Guard/releases/tag/v2.3.0
 
+## Raw Replay Index
+
+This appendix points assessors to the most direct raw evidence sources behind the
+feedback summaries above, so the review can move from curated narrative to primary artifacts.
+
+### Iteration and issue scopes
+
+- M0 scope issues:
+  - https://github.com/JasonEran/Aether-Guard/issues/20
+  - https://github.com/JasonEran/Aether-Guard/issues/21
+  - https://github.com/JasonEran/Aether-Guard/issues/23
+  - https://github.com/JasonEran/Aether-Guard/issues/25
+  - https://github.com/JasonEran/Aether-Guard/issues/26
+- M1 epic and scope:
+  - https://github.com/JasonEran/Aether-Guard/issues/10
+  - https://github.com/JasonEran/Aether-Guard/issues/29
+  - https://github.com/JasonEran/Aether-Guard/issues/30
+  - https://github.com/JasonEran/Aether-Guard/issues/31
+  - https://github.com/JasonEran/Aether-Guard/issues/32
+  - https://github.com/JasonEran/Aether-Guard/issues/33
+- M2 epic and scope:
+  - https://github.com/JasonEran/Aether-Guard/issues/11
+  - https://github.com/JasonEran/Aether-Guard/issues/34
+  - https://github.com/JasonEran/Aether-Guard/issues/35
+  - https://github.com/JasonEran/Aether-Guard/issues/36
+  - https://github.com/JasonEran/Aether-Guard/issues/37
+  - https://github.com/JasonEran/Aether-Guard/issues/38
+- M3 epic and scope:
+  - https://github.com/JasonEran/Aether-Guard/issues/12
+  - https://github.com/JasonEran/Aether-Guard/issues/39
+  - https://github.com/JasonEran/Aether-Guard/issues/40
+  - https://github.com/JasonEran/Aether-Guard/issues/41
+  - https://github.com/JasonEran/Aether-Guard/issues/42
+- M4 epic and scope:
+  - https://github.com/JasonEran/Aether-Guard/issues/13
+  - https://github.com/JasonEran/Aether-Guard/issues/43
+  - https://github.com/JasonEran/Aether-Guard/issues/44
+  - https://github.com/JasonEran/Aether-Guard/issues/45
+- CI / release hardening:
+  - https://github.com/JasonEran/Aether-Guard/issues/46
+  - https://github.com/JasonEran/Aether-Guard/issues/47
+  - https://github.com/JasonEran/Aether-Guard/issues/48
+
+### Release-track pull requests
+
+- `#49` full delivery / release readiness:
+  - https://github.com/JasonEran/Aether-Guard/pull/49
+- `#50` CI stabilization:
+  - https://github.com/JasonEran/Aether-Guard/pull/50
+- `#51` process templates + diagrams:
+  - https://github.com/JasonEran/Aether-Guard/pull/51
+
+### Replay path for assessors
+
+1. Start with the milestone summary in `docs/CP3407-Iteration-Log.md`.
+2. Open the linked issue scope above to view the raw discussion and closure history.
+3. Cross-check the implementation delta in the release-track PRs.
+4. Replay the validation artifact from the smoke/canary/release links listed in this page.
+
 ## Traceability Note
 
 This page is a consolidated evidence index for assessor replay. It does not replace raw issue/PR history,

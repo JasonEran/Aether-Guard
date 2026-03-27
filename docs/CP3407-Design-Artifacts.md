@@ -19,6 +19,32 @@ This page is the grading-facing registry for the rubric design requirement
 - **Database ERD**: chosen to prove telemetry, signals, model artifacts, and audit data have consistent keys/relations for reproducible analytics.
 - **UI prototype**: chosen to map operator tasks (observe -> decide -> trigger -> verify) before implementation, reducing UX rework risk.
 
+## Design Decision Traceability
+
+### Architectural Decisions
+
+| Decision | Why it was chosen | Tradeoff accepted | Code / artifact evidence |
+| --- | --- | --- | --- |
+| Split platform into Agent, Core, AI, and Web services | Keeps host-level operations, orchestration, inference, and UX concerns isolated so each component can evolve and fail independently | More deployment and observability complexity than a monolith | `docs/ARCHITECTURE-v2.3.md`, `src/services/**`, `src/web/**` |
+| Use .NET Core as control plane with gRPC + REST/JSON transcoding | Gives strong contracts for internal service boundaries while preserving assessor-friendly HTTP APIs for demos and dashboard calls | Requires Protobuf maintenance in addition to REST models | `src/shared/protos/*`, `src/services/core-dotnet/AetherGuard.Core/Grpc/*` |
+| Keep agent-side inference behind feature gates and fail-open fallback | Supports safer rollout on heterogeneous hosts and prevents model deployment failure from blocking core monitoring | Runtime path is more complex because both ML and fallback heuristics must be maintained | `docs/Agent-ONNX-Inference-v2.3-M3.md`, `src/services/agent-cpp/InferenceEngine.cpp` |
+
+### Database Decisions
+
+| Decision | Why it was chosen | Tradeoff accepted | Code / artifact evidence |
+| --- | --- | --- | --- |
+| PostgreSQL / TimescaleDB as primary store | Fits structured control-plane data plus time-series telemetry in one operationally simple stack | Less specialized than a dedicated TSDB + separate relational metadata store | `docker-compose.yml`, `src/db/init_timescaledb.sql`, `docs/design/AetherGuard-v2.3.dbml` |
+| Keep schema registry and audit data in the same relational model | Improves traceability for ingest validation, release evidence, and operator audits | Adds schema-management tables to the main application database | `ApplicationDbContext.cs`, `SchemaRegistryEntry.cs`, `CommandAudit.cs` |
+| Store snapshot artifacts in S3-compatible object storage instead of relational blobs | Better suited for large migration/checkpoint artifacts and retention automation | Introduces an extra service dependency (MinIO/S3) | `SnapshotStorageService.cs`, `docs/AI-Artifact-Versioning-v2.3-M2.md` |
+
+### Interface Decisions
+
+| Decision | Why it was chosen | Tradeoff accepted | Code / artifact evidence |
+| --- | --- | --- | --- |
+| Dashboard is organized around observe -> decide -> trigger -> verify | Mirrors the operator workflow used in smoke tests and milestone demos | Some advanced platform detail is intentionally hidden from first-run users | `docs/design/UI-Prototype-Spec-v2.3.md`, `src/web/dashboard/app/DashboardClient.tsx` |
+| Expose explainability fields (`alpha`, `P_preempt`, top signals) in the UI | Makes risk decisions auditable and answers stakeholder requests for operator trust | Adds denser information to the UI, requiring careful formatting | `docs/Web-Explainability-v2.3-M4.md`, `src/web/dashboard/components/ExplainabilityPanel.tsx` |
+| Include first-run guidance directly in the dashboard | Reduces demo friction and helps assessors reach time-to-value quickly | Adds onboarding UI that is not part of the core monitoring loop | `src/web/dashboard/components/FirstRunGuide.tsx`, `docs/Quickstart.md` |
+
 ## Ready-to-Use Source Assets
 
 ### Architecture UML

@@ -126,4 +126,78 @@ public class DynamicRiskPolicyTests
         Assert.Equal(1.4, decision.Alpha, 3);
         Assert.True(decision.ShouldMigrate);
     }
+
+    [Fact]
+    public void Constructor_NormalizesInvalidOptions()
+    {
+        var policy = new DynamicRiskPolicy(new DynamicRiskOptions
+        {
+            BaseAlpha = -3.0,
+            VolatilityWeight = -1.0,
+            SentimentWeight = -2.0,
+            MinAlpha = 0.0,
+            MaxAlpha = -5.0,
+            DecisionThreshold = 9.0,
+            CooldownMinutes = -10,
+            MaxMigrationsPerHour = 0
+        });
+
+        Assert.Equal(0.1, policy.Options.MinAlpha, 3);
+        Assert.Equal(0.1, policy.Options.MaxAlpha, 3);
+        Assert.Equal(0.1, policy.Options.BaseAlpha, 3);
+        Assert.Equal(0.0, policy.Options.VolatilityWeight, 3);
+        Assert.Equal(0.0, policy.Options.SentimentWeight, 3);
+        Assert.Equal(1.0, policy.Options.DecisionThreshold, 3);
+        Assert.Equal(0, policy.Options.CooldownMinutes);
+        Assert.Equal(1, policy.Options.MaxMigrationsPerHour);
+    }
+
+    [Fact]
+    public void ComputeAlpha_DoesNotDropBelowBaseWhenPositiveSentimentOutweighsNegative()
+    {
+        var alpha = DynamicRiskPolicy.ComputeAlpha(
+            new DynamicRiskOptions
+            {
+                BaseAlpha = 1.1,
+                VolatilityWeight = 0.3,
+                SentimentWeight = 0.7,
+                MinAlpha = 0.5,
+                MaxAlpha = 1.6
+            },
+            new DynamicRiskInput(
+                PreemptProbability: 0.2,
+                RebalanceSignal: false,
+                VolatilityProbability: 0.0,
+                SentimentNegative: 0.2,
+                SentimentPositive: 0.9));
+
+        Assert.Equal(1.1, alpha, 3);
+    }
+
+    [Fact]
+    public void Evaluate_ReturnsBelowThresholdReason_WhenDecisionScoreIsLow()
+    {
+        var policy = new DynamicRiskPolicy(new DynamicRiskOptions
+        {
+            BaseAlpha = 1.0,
+            DecisionThreshold = 0.75
+        });
+
+        var decision = policy.Evaluate(
+            new DynamicRiskInput(
+                PreemptProbability: 0.4,
+                RebalanceSignal: false,
+                VolatilityProbability: 0.0,
+                SentimentNegative: 0.0,
+                SentimentPositive: 0.8),
+            new RiskGuardrailState(
+                CooldownActive: false,
+                MaxRateExceeded: false,
+                RecentMigrationsLastHour: 0,
+                MaxMigrationsPerHour: 30));
+
+        Assert.False(decision.ShouldMigrate);
+        Assert.Equal("decision_score_below_threshold", decision.Reason);
+        Assert.Equal(0.4, decision.DecisionScore, 3);
+    }
 }
