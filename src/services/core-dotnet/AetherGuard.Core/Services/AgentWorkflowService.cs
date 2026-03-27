@@ -34,8 +34,11 @@ public class AgentWorkflowService
         }
 
         var hostname = request.Hostname.Trim();
+        var normalizedHostname = hostname.ToUpperInvariant();
         var existingAgent = await _context.Agents
-            .FirstOrDefaultAsync(agent => agent.Hostname == hostname, cancellationToken);
+            .FirstOrDefaultAsync(
+                agent => agent.Hostname.ToUpper() == normalizedHostname,
+                cancellationToken);
 
         if (existingAgent is not null)
         {
