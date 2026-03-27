@@ -1,30 +1,12 @@
-import { NextResponse } from 'next/server';
+import { proxyCoreJson } from "../route-utils";
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const coreBaseUrl = process.env.CORE_API_URL ?? 'http://core-service:8080';
-
 export async function GET() {
-  const response = await fetch(`${coreBaseUrl}/api/v1/dashboard/history`, {
-    cache: 'no-store',
+  return proxyCoreJson("/api/v1/dashboard/history", {
+    emptyPayload: [],
+    fetchFailureMessage: "Core dashboard history is unavailable.",
+    upstreamFailureMessage: "Failed to fetch telemetry history.",
   });
-
-  const text = await response.text();
-  if (!response.ok) {
-    return NextResponse.json({ error: text || 'Failed to fetch telemetry history.' }, { status: response.status });
-  }
-
-  if (!text) {
-    return NextResponse.json([], { status: response.status });
-  }
-
-  try {
-    return NextResponse.json(JSON.parse(text), { status: response.status });
-  } catch {
-    return new NextResponse(text, {
-      status: response.status,
-      headers: { 'Content-Type': response.headers.get('content-type') ?? 'text/plain' },
-    });
-  }
 }
