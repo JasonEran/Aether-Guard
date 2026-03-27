@@ -1,11 +1,12 @@
 # CP3407 TDD Ledger Verification Report
 
 - Release: `v2.3.0`
-- Ledger updated: `2026-02-27`
-- Entries verified: `8`
+- Ledger updated: `2026-03-28`
+- Entries verified: `9`
 
 | Entry | Level | Status | Test Commit (Date) | Impl Commit (Date) |
 | --- | --- | --- | --- | --- |
+| Web dashboard route proxy fetch resilience | A | PASS | `2bc6b99` (2026-03-28) | `0a6059e` (2026-03-28) |
 | M0 external signal parsing (#21/#26) | B | PASS | `66be642` (2026-02-02) | `66be642` (2026-02-02) |
 | M1 enrichment batch integration (#32) | B | PASS | `99a5864` (2026-02-19) | `99a5864` (2026-02-19) |
 | M3 per-agent rollout gating (#41) | B | PASS | `e817897` (2026-02-25) | `e817897` (2026-02-25) |
@@ -17,6 +18,7 @@
 
 ## Entry Notes
 
+- **web-dashboard-route-proxy-resilience** (PASS): ok
 - **m0-external-signal-parser** (PASS): ok
 - **m1-enrichment-batch** (PASS): ok
 - **m3-agent-rollout-gating** (PASS): ok

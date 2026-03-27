@@ -1,7 +1,20 @@
 {
   "release": "v2.3.0",
-  "updated": "2026-02-27",
+  "updated": "2026-03-28",
   "entries": [
+    {
+      "id": "web-dashboard-route-proxy-resilience",
+      "scope": "Web dashboard route proxy fetch resilience",
+      "evidence_level": "A",
+      "test_file": "src/web/dashboard/tests/dashboard.route-utils.test.ts",
+      "implementation_file": "src/web/dashboard/app/api/dashboard/route-utils.ts",
+      "test_commit": "2bc6b99",
+      "implementation_anchor_commit": "0a6059e",
+      "implementation_commits": [
+        "0a6059e"
+      ],
+      "notes": "Strict test-first flow: failing route proxy fetch-resilience test committed before helper implementation and route refactor."
+    },
     {
       "id": "m0-external-signal-parser",
       "scope": "M0 external signal parsing (#21/#26)",
