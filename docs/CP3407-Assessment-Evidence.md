@@ -1,4 +1,4 @@
-# CP3407 HD Evidence Matrix (Aether-Guard v2.3)
+# CP3407 Assessment Evidence Matrix (Aether-Guard v2.3)
 
 Last updated: 2026-02-27
 
@@ -7,7 +7,7 @@ This page maps the repository evidence to:
 - `CP3407_ProjectRubric.docx`
 - `CP3407_Projects.docx`
 
-Goal: demonstrate HD-level readiness and identify uplift items to exceed HD.
+Goal: consolidate assessment evidence and identify the highest-value uplift items.
 
 ## A. CP3407 Projects Compliance (Hard Requirements)
 
@@ -16,9 +16,9 @@ Goal: demonstrate HD-level readiness and identify uplift items to exceed HD.
 | Software/IT development project with source code | Multi-service codebase across C++, .NET, Python, and Next.js (`src/services/**`, `src/web/**`) | Met |
 | Modern database required | TimescaleDB/PostgreSQL in compose (`docker-compose.yml`) | Met |
 | Modern GUI required | Next.js dashboard with authenticated UI and API routes (`src/web/dashboard/**`) | Met |
-| Use modern tools/libraries encouraged for HD | .NET 8, FastAPI, Next.js 16, Docker, OpenTelemetry, CI supply-chain signing (`README.md`, `.github/workflows/**`) | Met |
+| Use of modern tools/libraries | .NET 8, FastAPI, Next.js 16, Docker, OpenTelemetry, CI supply-chain signing (`README.md`, `.github/workflows/**`) | Met |
 
-## B. Rubric Mapping (HD Target)
+## B. Rubric Mapping
 
 ### 1) Requirements
 
@@ -27,7 +27,7 @@ Current evidence:
 - v2.3 milestones and scope are explicitly defined with exit criteria (`docs/ROADMAP-v2.3.md`).
 - Work is decomposed into epics/issues with completion status (GitHub issues #9-#48 all closed).
 
-HD+ uplift delivered:
+Evidence uplift delivered:
 
 - Requirements matrix with priority, estimation, and sequencing is documented in `docs/CP3407-Requirements-v2.3.md`.
 - Numeric on-time/on-budget tracking table is documented in `docs/CP3407-Budget-Tracking-v2.3.md`.
@@ -39,7 +39,7 @@ Current evidence:
 - Architecture rationale and end-to-end flow (`docs/ARCHITECTURE-v2.3.md`).
 - UML-style class diagrams for Core/Agent/AI/Web (`docs/diagrams/Class-Diagram-v2.3.md`).
 
-HD+ uplift delivered:
+Evidence uplift delivered:
 
 - External-tool artifact links, exports, and design rationale are tracked in `docs/CP3407-Design-Artifacts.md`.
 
@@ -51,7 +51,7 @@ Current evidence:
 - Milestone closure and implementation references (`docs/Release-Notes-v2.3.md`).
 - Merged release-track PRs (#49, #50, #51).
 
-Status: strong for HD.
+Status: strong evidence base.
 
 Additional closure evidence:
 
@@ -66,7 +66,7 @@ Current evidence:
 - Smoke/canary checklists (`docs/QA-SmokeTest-v2.3.md`, `docs/QA-SmokeTest-v2.3-M1.md`, `docs/QA-Canary-Rollback-v2.3-M3.md`).
 - New quality gate workflow (`.github/workflows/quality-gate.yml`) for build/test/lint automation.
 
-HD+ uplift delivered:
+Evidence uplift delivered:
 
 - Baseline AI/Web automated tests are in place:
   - `src/services/ai-engine/tests/test_model.py`
@@ -83,7 +83,7 @@ Current evidence:
 - Structured issue templates and PR template (`.github/ISSUE_TEMPLATE/**`, `.github/PULL_REQUEST_TEMPLATE.md`).
 - Traceable issue-to-PR-to-release chain across v2.3 epics.
 
-Status: HD-ready.
+Status: assessor-ready.
 
 ### 6) Building & Development Tools
 
@@ -93,7 +93,7 @@ Current evidence:
 - CI quality gate + supply-chain workflows (`.github/workflows/quality-gate.yml`, `.github/workflows/supply-chain.yml`).
 - SBOM/signing/provenance integration (supply-chain workflow + release documentation).
 
-HD+ uplift delivered:
+Evidence uplift delivered:
 
 - Toolchain usage rationale is documented in `docs/CP3407-Toolchain-Rationale-v2.3.md`.
 
@@ -105,7 +105,7 @@ Current evidence:
 - Acceptance-oriented PR template (`docs/PR-Template-v2.3-Acceptance.md`).
 - Iteration evidence log with goal/demo/feedback/retrospective actions (`docs/CP3407-Iteration-Log.md`).
 
-HD+ uplift in place:
+Evidence uplift in place:
 
 - Iteration log format is established and should continue for future releases (`docs/CP3407-Iteration-Log.md`).
 
@@ -116,7 +116,7 @@ Current evidence:
 - Extensive operational/docs coverage (Quickstart, FAQ, Troubleshooting, runbooks, release notes).
 - v2.3 architecture and milestone documents are cross-linked from README.
 
-HD+ uplift in place:
+Evidence uplift in place:
 
 - Assessor-facing entry points are centralized and cross-linked (`docs/CP3407-Assessor-OneClick.md`, `README.md`).
 
@@ -129,7 +129,7 @@ HD+ uplift in place:
 - Release published:
   - https://github.com/JasonEran/Aether-Guard/releases/tag/v2.3.0
 
-## D. HD+ Closure Backlog (Priority Order)
+## D. Evidence Closure Backlog (Priority Order)
 
 1. Increase strict test-first (Level A) ratio for new features; keep reducing Level B/C exceptions.
 2. Expand AI/Web test depth (integration/e2e and richer failure-path cases).

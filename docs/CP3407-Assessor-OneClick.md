@@ -6,8 +6,8 @@ Use this page as the single entry point for marking evidence.
 
 ## 1) Project Requirement Compliance
 
-- Projects requirement summary:
-  - `docs/CP3407-HD-Evidence.md`
+- Assessment evidence summary:
+  - `docs/CP3407-Assessment-Evidence.md`
 - Requirements/priority/estimation evidence:
   - `docs/CP3407-Requirements-v2.3.md`
 - Budget and schedule tracking (on-time/on-budget numeric table):

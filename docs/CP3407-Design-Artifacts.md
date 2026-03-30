@@ -88,7 +88,7 @@ Suggested export format:
 4. Update status to `Completed`.
 5. Link this page from PR/release evidence comments.
 
-## Minimum Completion Criteria (for HD Design)
+## Recommended Completion Criteria for Design Evidence
 
 - [x] External-tool UML link + export
 - [x] External-tool ERD link + export
